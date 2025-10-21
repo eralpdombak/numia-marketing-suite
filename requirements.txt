@@ -1,0 +1,9 @@
+# Core dependencies for content generation
+anthropic>=0.18.0
+pyyaml>=6.0
+python-dotenv>=1.0.0
+
+# Intelligence system dependencies
+requests>=2.31.0
+feedparser>=6.0.10
+beautifulsoup4>=4.12.0

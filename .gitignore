@@ -1,0 +1,40 @@
+# Environment variables (NEVER COMMIT)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Intelligence data (scraped competitor data - should not be committed)
+intelligence/data/
+
+# Content tracking log
+content_log.json
+
+# Output files (optional - uncomment if you don't want to track generated content)
+# output/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# Streamlit
+.streamlit/
+
+# Background processes
+*.pid

@@ -1,0 +1,6 @@
+# Intelligence data (contains competitive research)
+data/
+
+# Python
+__pycache__/
+*.pyc
