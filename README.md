@@ -12,7 +12,7 @@ pip install -r requirements.txt
 
 # 2. Set up API keys
 cp .env.example .env
-# Edit .env and add your ANTHROPIC_API_KEY and OPENAI_API_KEY
+# Edit .env and add your ANTHROPIC_API_KEY
 
 # 3. Generate content
 python3 main.py linkedin "your topic"
@@ -61,21 +61,9 @@ Before creating content:
 - **Quarterly:** Review audience insights
 - **Annually:** Revise brand guidelines
 
-### Content Learning System
+### Content Tracking
 
-B2B Marketing AI tracks every piece of content you generate to:
-- Prevent duplicate topics
-- Track what's been created (timestamp, type, word count)
-- Build a searchable history
-- Show generation statistics
-
-**View your content history:**
-```bash
-python3 content_stats.py                    # View stats and recent content
-python3 content_stats.py search reorgs      # Search by keyword
-```
-
-All tracking data is stored in `content_log.json` (gitignored for privacy).
+B2B Marketing AI automatically tracks every piece of content you generate (timestamp, type, word count) in `content_log.json` for your records.
 
 ---
 
@@ -83,40 +71,28 @@ All tracking data is stored in `content_log.json` (gitignored for privacy).
 
 ### Content Generation Commands
 
-**Blog Post** (1500 words, technical, SEO-optimized)
+**Blog Post** (Technical, SEO-optimized, natural length)
 ```bash
 python3 main.py blog "your topic"
 python3 main.py blog "your topic" --perspectives investor,crypto-expert
 ```
 
-**Twitter Thread** (10 tweets, engaging format)
+**Twitter Thread** (Natural length based on topic, 5-15 tweets)
 ```bash
 python3 main.py thread "your topic"
 python3 main.py thread "your topic" --perspectives developer,business
 ```
 
-**Newsletter** (800-1000 words, email format with subject line)
+**Newsletter** (Email format with subject line, natural length)
 ```bash
 python3 main.py newsletter "your topic"
 python3 main.py newsletter "your topic" --perspectives researcher
 ```
 
-**LinkedIn Post** (100-120 words, professional, no hashtags)
+**LinkedIn Post** (Professional, natural length 80-200 words)
 ```bash
 python3 main.py linkedin "your topic"
 python3 main.py linkedin "your topic" --perspectives business,investor
-```
-
-**Short Video Script** (60 seconds for TikTok/Reels/Shorts)
-```bash
-python3 main.py short-video "your topic"
-python3 main.py short-video "your topic" --perspectives developer
-```
-
-**Demo Video Script** (3-5 minutes, product walkthrough)
-```bash
-python3 main.py demo-video "your topic"
-python3 main.py demo-video "your topic" --perspectives crypto-expert,developer
 ```
 
 **Auto-Generate Topic** (AI generates relevant topic + research)
@@ -131,9 +107,9 @@ python3 main.py blog  # No topic = auto-generates one
 - LinkedIn Posts: `output/linkedin/`
 - Instagram Posts: `output/instagram/`
 
-## Multi-Perspective Generation
+## Multi-Perspective Enrichment
 
-Generate content from different viewpoints using the `--perspectives` flag. Each perspective shapes the content's angle and focus.
+Enrich content with insights from multiple perspectives using the `--perspectives` flag. This creates ONE comprehensive piece that incorporates viewpoints from different audiences.
 
 ### Available Perspectives
 
@@ -147,97 +123,50 @@ Generate content from different viewpoints using the `--perspectives` flag. Each
 
 **Single perspective:**
 ```bash
-python3 main.py blog "cross-chain data consistency" --perspectives investor
+python3 main.py blog "cross-chain data consistency" --perspectives developer
 ```
+→ Creates 1 blog post with developer-focused insights
 
-**Multiple perspectives:**
+**Multiple perspectives combined:**
 ```bash
 python3 main.py blog "cross-chain data consistency" --perspectives investor,crypto-expert,developer
 ```
+→ Creates 1 comprehensive blog post that includes:
+- Technical implementation details (developer)
+- Protocol-level analysis (crypto-expert)
+- Market opportunity insights (investor)
 
-This generates 3 blog posts:
-- `output/blogs/2025-10-14_cross-chain_data_consistency_investor.md`
-- `output/blogs/2025-10-14_cross-chain_data_consistency_crypto-expert.md`
-- `output/blogs/2025-10-14_cross-chain_data_consistency_developer.md`
+**Output:**
+- `output/blogs/2025-10-23_cross-chain_data_consistency.md` (single file with all perspectives blended)
 
 **How it works:**
-1. Each perspective adds specialized guidelines to the generation prompt
-2. Content maintains Numia's brand voice but focuses on perspective-specific concerns
-3. Files are named with perspective suffixes for easy identification
+1. All specified perspectives are loaded as context
+2. The AI incorporates insights from each perspective into a single cohesive piece
+3. Content maintains Numia's brand voice while addressing multiple audience concerns
 
 **When to use perspectives:**
-- Investor: Pitches, market analysis, competitive positioning
-- Crypto Expert: Protocol deep dives, technical architecture, security analysis
-- Developer: Tutorials, integration guides, troubleshooting
-- Business: ROI analysis, team efficiency, vendor comparisons
-- Researcher: Academic content, theoretical foundations, research summaries
+- Investor: Add market analysis and business value
+- Crypto Expert: Add deep technical protocol details
+- Developer: Add practical implementation guidance
+- Business: Add ROI and productivity insights
+- Researcher: Add theoretical foundations and academic context
 
 ## Project Structure
 
 ```
 b2b-marketing-ai/
-├── intelligence/        # Competitive intelligence system
-│   ├── scrapers/        # Data collection modules
-│   ├── data/            # Saved intelligence
-│   └── config.yaml      # Competitor profiles
 ├── memory/              # Brand voice, perspectives & research
 │   ├── perspectives/    # Content perspectives (investor, developer, etc.)
 │   ├── post-guidelines/ # Content type guidelines
 │   └── research/        # Research materials & reference docs
 ├── output/              # Generated content
 │   ├── blogs/
-│   ├── instagram/
 │   ├── linkedin/
 │   ├── newsletters/
 │   └── threads/
 ├── src/                 # Source code
-├── main.py              # Main CLI
-└── intel.py             # Intelligence CLI
+└── main.py              # Main CLI
 ```
-
-## Competitive Intelligence
-
-### On-Demand Intelligence
-Ask questions about competitors and get instant intelligence reports. See [`intelligence/README.md`](intelligence/README.md) for full docs.
-
-```bash
-# Ask any competitive question
-python3 intel.py query "What are Dune's main weaknesses?"
-
-# Get competitor profile
-python3 intel.py profile dune
-
-# Feature gap analysis
-python3 intel.py gaps
-
-# Pricing intelligence
-python3 intel.py pricing
-
-# Daily digest
-python3 intel.py digest
-```
-
-### Real-Time Monitoring
-Automated tracking of competitor activity. See [`intelligence/MONITORING.md`](intelligence/MONITORING.md) for full docs.
-
-```bash
-# Run single scan
-python3 monitor.py scan
-
-# Start continuous monitoring
-python3 monitor.py start
-
-# View alerts
-python3 monitor.py alerts
-```
-
-**Monitors:**
-- 📰 RSS feeds (blogs)
-- 🐦 Twitter activity
-- 🔧 GitHub repos
-- 💲 Pricing pages
-
-**Tracked Competitors:** Dune, Nansen, Flipside, The Graph, Messari
 
 ---
 

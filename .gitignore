@@ -18,9 +18,6 @@ ENV/
 *.swo
 *~
 
-# Intelligence data (scraped competitor data - should not be committed)
-intelligence/data/
-
 # Content tracking log
 content_log.json
 

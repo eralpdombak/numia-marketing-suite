@@ -6,12 +6,6 @@
 
 **What's Numia?** A full-stack on-chain data company covering:
 RPCs → Indexing → Real-time APIs → Dashboards → Analytics → Marketing.
-
-Born in Cosmos, now expanding into EVM, SVM, and Move.
-
-Or as Rafa puts it:
-*"Alchemy + Dune + Addressable in one."*
-
 ---
 
 ## Visual Identity Guidelines
@@ -1281,8 +1275,6 @@ Numia's architecture is built on five foundational principles:
 │  └──────────┘  └──────────┘  └──────────┘      │
 └──────────────────────────────────────────────────┘
 ```
-
-[Document continues with detailed technical specifications...]
 
 ---
 
