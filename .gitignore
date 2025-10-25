@@ -1,6 +1,9 @@
 # Environment variables (NEVER COMMIT)
 .env
 
+# Claude Code slash commands (project-specific)
+.claude/commands/
+
 # Python
 __pycache__/
 *.py[cod]
