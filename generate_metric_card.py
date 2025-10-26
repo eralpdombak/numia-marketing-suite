@@ -10,28 +10,14 @@ Template specs:
 
 from PIL import Image, ImageDraw, ImageFont
 import os
+import random
 from datetime import datetime
 
 
 def get_next_template():
-    """Rotate through MC1-MC5 templates"""
-    counter_file = "templates/.template_counter"
-
-    # Read current counter
-    if os.path.exists(counter_file):
-        with open(counter_file, 'r') as f:
-            current = int(f.read().strip())
-    else:
-        current = 0
-
-    # Increment and wrap around (1-5)
-    next_num = (current % 5) + 1
-
-    # Save next counter
-    with open(counter_file, 'w') as f:
-        f.write(str(next_num))
-
-    return f"templates/MC{next_num}.png"
+    """Randomly select from MC1-MC5 templates"""
+    template_num = random.randint(1, 5)
+    return f"templates/MC{template_num}.png"
 
 
 def generate_metric_card(number: str, subheader: str, output_path: str = None):
@@ -75,17 +61,53 @@ def generate_metric_card(number: str, subheader: str, output_path: str = None):
 
     # Try to load fonts, fallback to default if not found
     try:
-        # Number font - Poppins Bold, size 120
+        # Start with a size based on length as initial guess
+        if len(number) > 30:
+            main_font_size = 65
+        elif len(number) > 20:
+            main_font_size = 80
+        elif len(number) > 10:
+            main_font_size = 105
+        else:
+            main_font_size = 130
+
+        # Load font with initial size
         number_font = None
         for path in font_paths:
             expanded_path = os.path.expanduser(path)
             if os.path.exists(expanded_path):
-                number_font = ImageFont.truetype(expanded_path, 120)
+                number_font = ImageFont.truetype(expanded_path, main_font_size)
                 break
 
         if not number_font:
             print("Warning: Poppins Bold not found, using default font")
             number_font = ImageFont.load_default()
+
+        # Check actual width and shrink if needed (1200px canvas, leave 100px margin on each side)
+        max_width = 1000
+        bbox = draw.textbbox((0, 0), number, font=number_font, anchor="ma")
+        text_width = bbox[2] - bbox[0]
+
+        # If too wide, shrink font until it fits
+        while text_width > max_width and main_font_size > 40:
+            main_font_size -= 5
+            for path in font_paths:
+                expanded_path = os.path.expanduser(path)
+                if os.path.exists(expanded_path):
+                    number_font = ImageFont.truetype(expanded_path, main_font_size)
+                    break
+            bbox = draw.textbbox((0, 0), number, font=number_font, anchor="ma")
+            text_width = bbox[2] - bbox[0]
+
+        # Consistent positioning: check for descenders and adjust gap
+        # Characters with descenders: g, j, p, q, y
+        has_descenders = any(char in number.lower() for char in 'gjpqy')
+
+        main_y_pos = 235
+        if has_descenders:
+            sub_y_pos = 415  # Extra gap for descenders
+        else:
+            sub_y_pos = 405  # Standard gap
 
         # Subheader font - Poppins Semibold, size 32
         subheader_font = None
@@ -103,13 +125,12 @@ def generate_metric_card(number: str, subheader: str, output_path: str = None):
         print(f"Font loading error: {e}")
         number_font = ImageFont.load_default()
         subheader_font = ImageFont.load_default()
+        main_y_pos = 164
+        sub_y_pos = 365
 
     # Draw text centered (template is 1200px wide, so center = 600)
-    # Number: Y164, centered
-    draw.text((600, 164), number, font=number_font, fill="white", anchor="ma")
-
-    # Subheader: Y365, centered
-    draw.text((600, 365), subheader, font=subheader_font, fill="white", anchor="ma")
+    draw.text((600, main_y_pos), number, font=number_font, fill="white", anchor="ma")
+    draw.text((600, sub_y_pos), subheader, font=subheader_font, fill="white", anchor="ma")
 
     # Determine output path
     if output_path is None:
