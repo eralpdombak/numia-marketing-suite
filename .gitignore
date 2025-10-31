@@ -21,11 +21,11 @@ ENV/
 *.swo
 *~
 
-# Content tracking log
-content_log.json
+# Archive
+archive/
 
-# Output files (optional - uncomment if you don't want to track generated content)
-# output/
+# Output files (generated content - keep out of git)
+output/
 
 # macOS
 .DS_Store

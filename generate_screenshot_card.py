@@ -4,21 +4,19 @@ Places screenshots on branded templates with rounded corners.
 
 Template specs:
 - Size: 1200x675px
-- Screenshot position: X41, Y98
-- Screenshot size: 1117x517
+- Screenshot position: X111, Y87
+- Screenshot size: 978x543
 - Border radius: 26px on bottom-left and bottom-right corners
 """
 
 from PIL import Image, ImageDraw
 import os
-import random
 from datetime import datetime
 
 
-def get_random_template():
-    """Randomly select from SS1-SS3 templates"""
-    template_num = random.randint(1, 3)
-    return f"templates/SS{template_num}.png"
+def get_template():
+    """Get the SS template"""
+    return "templates/SS.png"
 
 
 def create_rounded_rectangle_mask(size, radius, corners):
@@ -71,13 +69,13 @@ def generate_screenshot_card(screenshot_path: str, output_path: str = None):
     Returns:
         str: Path to the generated image
     """
-    # Get random template
-    template_path = get_random_template()
+    # Get template
+    template_path = get_template()
 
     if not os.path.exists(template_path):
         raise FileNotFoundError(
             f"Template not found at {template_path}\n"
-            "Make sure SS1.png through SS3.png exist in templates/"
+            "Make sure SS.png exists in templates/"
         )
 
     # Load template
@@ -91,7 +89,7 @@ def generate_screenshot_card(screenshot_path: str, output_path: str = None):
     screenshot = Image.open(screenshot_path)
 
     # Crop to fill (maintains aspect ratio, crops excess)
-    screenshot_size = (1117, 517)
+    screenshot_size = (978, 543)
     target_ratio = screenshot_size[0] / screenshot_size[1]
     img_ratio = screenshot.width / screenshot.height
 
@@ -117,7 +115,7 @@ def generate_screenshot_card(screenshot_path: str, output_path: str = None):
     screenshot.putalpha(mask)
 
     # Paste screenshot onto template at specified position
-    position = (41, 98)
+    position = (111, 87)
     template.paste(screenshot, position, screenshot)
 
     # Determine output path

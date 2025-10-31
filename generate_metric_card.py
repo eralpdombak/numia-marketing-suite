@@ -10,14 +10,12 @@ Template specs:
 
 from PIL import Image, ImageDraw, ImageFont
 import os
-import random
 from datetime import datetime
 
 
-def get_next_template():
-    """Randomly select from MC1-MC5 templates"""
-    template_num = random.randint(1, 5)
-    return f"templates/MC{template_num}.png"
+def get_template():
+    """Get the MC template"""
+    return "templates/MC.png"
 
 
 def generate_metric_card(number: str, subheader: str, output_path: str = None):
@@ -32,13 +30,13 @@ def generate_metric_card(number: str, subheader: str, output_path: str = None):
     Returns:
         str: Path to the generated image
     """
-    # Get next template in rotation
-    template_path = get_next_template()
+    # Get template
+    template_path = get_template()
 
     if not os.path.exists(template_path):
         raise FileNotFoundError(
             f"Template not found at {template_path}\n"
-            "Make sure MC1.png through MC5.png exist in templates/"
+            "Make sure MC.png exists in templates/"
         )
 
     # Load template
