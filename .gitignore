@@ -26,6 +26,7 @@ archive/
 
 # Output files (generated content - keep out of git)
 output/
+content_index.json
 
 # macOS
 .DS_Store
@@ -38,3 +39,6 @@ output/
 
 # Background processes
 *.pid
+
+# Frontend (perfect-shot) - separate repo
+frontend/

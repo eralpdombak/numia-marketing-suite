@@ -28,9 +28,8 @@ The system automatically loads:
 2. **Audience insights** - Customer profiles, platforms, priorities
 3. **Products catalog** - Features, pricing, use cases
 4. **Messaging framework** - Themes, narratives, objections
-5. **Competitive intel** - Differentiation, competitor tracking
-6. **Compliance rules** - Legal requirements, regional regulations
-7. **Performance data** - Proven campaign patterns, examples
+5. **Compliance rules** - Legal requirements, regional regulations
+6. **Performance data** - Proven campaign patterns, examples
 
 **Location:** All brand context lives in `memory/numia_brand.md`
 
@@ -57,13 +56,33 @@ Before creating content:
 
 ### Maintenance Schedule
 - **Weekly:** Update performance metrics in brand memory
-- **Monthly:** Refresh competitive intelligence via monitoring
 - **Quarterly:** Review audience insights
 - **Annually:** Revise brand guidelines
 
 ### Content Tracking
 
-B2B Marketing AI automatically tracks every piece of content you generate (timestamp, type, word count) in `content_log.json` for your records.
+Smart content tracking that only summarizes new content when it makes sense:
+
+```bash
+# Track new content (detects duplicates via hash)
+python3 track_content.py
+
+# View your content library
+python3 track_content.py --summary
+```
+
+Or use slash commands: `/track` and `/content-library`
+
+**What it does:**
+- Scans output directories for new content
+- Uses Claude to generate smart summaries (topic, hook, key points, use case)
+- Detects duplicates and changed content via file hash
+- Saves to `content_index.json` for easy reference
+
+**When to use:**
+- After generating important content you might reference later
+- Before starting new content to avoid repeating topics
+- Periodically to build your searchable content library
 
 ---
 
@@ -105,7 +124,6 @@ python3 main.py blog  # No topic = auto-generates one
 - Twitter Threads: `output/threads/`
 - Newsletters: `output/newsletters/`
 - LinkedIn Posts: `output/linkedin/`
-- Instagram Posts: `output/instagram/`
 
 ## Multi-Perspective Enrichment
 
