@@ -1,0 +1,25 @@
+{
+  "name": "b2b-marketing-ai",
+  "version": "1.0.0",
+  "description": "Numia's AI-powered marketing content generator with local API bridge",
+  "private": true,
+  "scripts": {
+    "dev": "./dev.sh",
+    "api": "node server.js",
+    "frontend": "cd frontend && npm run dev",
+    "setup": "npm install && cd frontend && npm install"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "ai",
+    "marketing",
+    "content-generation",
+    "local-first"
+  ],
+  "author": "Numia",
+  "license": "PROPRIETARY"
+}

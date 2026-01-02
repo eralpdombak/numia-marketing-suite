@@ -8,10 +8,6 @@ import json
 import hashlib
 from datetime import datetime
 from pathlib import Path
-import anthropic
-from dotenv import load_dotenv
-
-load_dotenv()
 
 CONTENT_INDEX = "content_index.json"
 OUTPUT_DIRS = {
@@ -42,58 +38,44 @@ def save_index(index):
         json.dump(index, indent=2, fp=f)
 
 
-def summarize_content(filepath, content_type):
-    """Generate smart summary of content using Claude"""
-    client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
-
-    with open(filepath, 'r') as f:
-        content = f.read()
-
-    prompt = f"""Analyze this {content_type} content and provide a concise summary.
-
-Content:
-{content}
-
-Provide JSON with:
-{{
-    "main_topic": "one sentence topic/headline",
-    "key_points": ["point 1", "point 2", "point 3"],
-    "tone": "description of tone (e.g., technical, conversational, data-driven)",
-    "hook": "the main hook or value proposition",
-    "use_case": "when/why would someone reference this?"
-}}
-
-Be specific. Focus on what makes this piece unique or useful."""
-
-    response = client.messages.create(
-        model="claude-3-7-sonnet-20250219",
-        max_tokens=500,
-        messages=[{"role": "user", "content": prompt}]
-    )
-
-    result_text = ""
-    for block in response.content:
-        if hasattr(block, 'text'):
-            result_text += block.text
-
-    # Extract JSON from markdown code blocks if present
+def extract_post_copy(content):
+    """Extract just the POST COPY section from markdown files"""
     import re
-    json_match = re.search(r'```json\s*(\{.*?\})\s*```', result_text, re.DOTALL)
-    if json_match:
-        result_text = json_match.group(1)
 
-    try:
-        return json.loads(result_text)
-    except json.JSONDecodeError:
-        # Fallback minimal summary
-        return {
-            "main_topic": os.path.basename(filepath),
-            "key_points": ["Content saved but summary failed to parse"],
-            "tone": "unknown",
-            "hook": "N/A",
-            "use_case": "Reference generated content"
-        }
+    # Try to find POST COPY section
+    match = re.search(r'## POST COPY\s*\n\n(.*?)(?=\n---|\n##|$)', content, re.DOTALL)
+    if match:
+        return match.group(1).strip()
 
+    # If no POST COPY section, assume entire file is the post
+    # Remove the title heading (first # line) and return the rest
+    lines = content.split('\n')
+    if lines and lines[0].startswith('# '):
+        # Skip the title line and any empty lines after it
+        content_lines = []
+        for i, line in enumerate(lines[1:], 1):
+            if line.strip():  # Found first non-empty line
+                content_lines = lines[i:]
+                break
+        return '\n'.join(content_lines).strip()
+
+    # Fallback: return content as-is
+    return content.strip()
+
+def extract_title(content):
+    """Extract a clean title from markdown file"""
+    import re
+
+    # Try to find the first heading
+    match = re.search(r'^#\s+(.+?)$', content, re.MULTILINE)
+    if match:
+        # Clean up the title - remove "LinkedIn Post:" prefix if present
+        title = match.group(1)
+        title = re.sub(r'^LinkedIn Post:\s*', '', title)
+        return title.strip()
+
+    # Fallback to filename-based title
+    return "LinkedIn Post"
 
 def scan_and_track():
     """Scan output directories and track new content"""
@@ -121,22 +103,32 @@ def scan_and_track():
                 else:
                     print(f"⚠️  Content changed: {filename}")
 
-            # New or changed content - summarize it
-            print(f"📝 Summarizing new {content_type}: {filename}")
-            summary = summarize_content(filepath, content_type)
+            # Extract content
+            with open(filepath, 'r') as f:
+                full_content = f.read()
+
+            if content_type in ['linkedin', 'twitter']:
+                print(f"📝 Extracting {content_type} post: {filename}")
+                display_content = extract_post_copy(full_content)
+                title = extract_title(full_content)
+            else:
+                print(f"📝 Tracking {content_type}: {filename}")
+                display_content = full_content
+                title = filename
 
             index["tracked_files"][filepath] = {
                 "hash": file_hash,
                 "content_type": content_type,
                 "filename": filename,
                 "tracked_at": datetime.now().isoformat(),
-                "summary": summary
+                "title": title,
+                "display_content": display_content
             }
 
             new_content.append({
                 "type": content_type,
                 "file": filename,
-                "summary": summary
+                "title": title
             })
 
     if new_content:
@@ -171,11 +163,9 @@ def show_summary():
         print(f"\n{content_type.upper()} ({len(items)} pieces)")
         print("-" * 40)
         for item in items:
-            summary = item["summary"]
             print(f"\n  {item['filename']}")
-            print(f"  Topic: {summary.get('main_topic', 'N/A')}")
-            print(f"  Hook: {summary.get('hook', 'N/A')}")
-            print(f"  Use case: {summary.get('use_case', 'N/A')}")
+            print(f"  Title: {item.get('title', 'N/A')}")
+            print(f"  Created: {item.get('tracked_at', 'N/A')}")
 
 
 if __name__ == "__main__":
@@ -186,7 +176,7 @@ if __name__ == "__main__":
     else:
         new_items = scan_and_track()
         if new_items:
-            print("\nNew content summaries:")
+            print("\nNew content added:")
             for item in new_items:
                 print(f"\n  {item['type']}: {item['file']}")
-                print(f"    {item['summary']['main_topic']}")
+                print(f"    {item['title']}")
