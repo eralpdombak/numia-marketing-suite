@@ -39,7 +39,3 @@ content_index.json
 
 # Background processes
 *.pid
-
-# Frontend (perfect-shot) - separate repo
-frontend/
-node_modules/
