@@ -42,3 +42,4 @@ content_index.json
 
 # Frontend (perfect-shot) - separate repo
 frontend/
+node_modules/
