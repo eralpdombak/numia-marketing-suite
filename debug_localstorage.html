@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LocalStorage Debug</title>
+</head>
+<body>
+    <h1>LocalStorage Contents</h1>
+    <pre id="output"></pre>
+    <script>
+        const key = "numia-shots-library";
+        const data = localStorage.getItem(key);
+        const output = document.getElementById('output');
+        
+        if (data) {
+            output.textContent = JSON.stringify(JSON.parse(data), null, 2);
+        } else {
+            output.textContent = "No data found for key: " + key;
+        }
+        
+        console.log("LocalStorage check:", data);
+    </script>
+</body>
+</html>
