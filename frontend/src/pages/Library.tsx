@@ -28,6 +28,8 @@ interface DbLibraryItem {
   platform: string | null;
   created_at: string;
   title: string | null;
+  // Note: summary and other metadata are intentionally excluded
+  // Only public-facing content should be displayed
 }
 
 type TabType = "text" | "image";
@@ -198,6 +200,22 @@ const platformIcons: Record<string, React.FC<{ className?: string }>> = {
   newsletter: MailIcon,
 };
 
+// Clean LinkedIn content by removing AI-generated options text
+function cleanLinkedInContent(content: string, platform: string | null): string {
+  if (platform !== 'linkedin') return content;
+
+  // Remove "Here's a few options..." or similar introductory text
+  let cleaned = content.replace(/^(?:here'?s?|here are)\s+(?:\d+\s+)?(?:a few\s+)?options?[^\n]*\n*/i, '');
+
+  // Remove "Option X:" or "Option X." prefixes at the start or after newlines
+  cleaned = cleaned.replace(/(?:^|\n+)option\s+\d+[:.]\s*/gi, '');
+
+  // Remove extra leading/trailing whitespace
+  cleaned = cleaned.trim();
+
+  return cleaned;
+}
+
 export default function Library() {
   const [activeTab, setActiveTab] = useState<TabType>("text");
   const [textItems, setTextItems] = useState<DbLibraryItem[]>([]);
@@ -312,16 +330,27 @@ export default function Library() {
       if (IS_LOCAL_MODE) {
         // Load from local API server
         const data = await localApi.getAll();
+        console.log('[Library] Loaded from local API:', data.length, 'items');
         setTextItems(data.filter(item => item.type === "text") as DbLibraryItem[]);
       } else {
         // Load from Supabase (cloud mode)
+        console.log('[Library] Loading from Supabase...');
         const { data, error } = await supabase
           .from("library_items")
           .select("*")
           .order("created_at", { ascending: false });
 
-        if (error) throw error;
-        setTextItems((data as DbLibraryItem[]).filter(item => item.type === "text"));
+        if (error) {
+          console.error('[Library] Supabase error:', error);
+          throw error;
+        }
+
+        console.log('[Library] Supabase returned:', data?.length || 0, 'items');
+        console.log('[Library] Supabase data:', data);
+
+        const textItems = (data as DbLibraryItem[]).filter(item => item.type === "text");
+        console.log('[Library] Filtered text items:', textItems.length);
+        setTextItems(textItems);
 
         const saved = localStorage.getItem(LIBRARY_STORAGE_KEY);
         if (saved) {
@@ -471,9 +500,35 @@ export default function Library() {
 
   const handleViewFull = async (item: DbLibraryItem) => {
     try {
-      // Fetch full content from API
-      const fullItem = await localApi.getOne(item.id);
-      setSelectedText(fullItem);
+      let fullItem: DbLibraryItem;
+
+      if (IS_LOCAL_MODE) {
+        // Fetch full content from local API
+        fullItem = await localApi.getOne(item.id);
+      } else {
+        // Fetch full content from Supabase
+        const { data, error } = await supabase
+          .from("library_items")
+          .select("*")
+          .eq("id", item.id)
+          .single();
+
+        if (error) throw error;
+        fullItem = data as DbLibraryItem;
+      }
+
+      // Filter out secret metadata - only keep public-facing fields
+      const publicItem: DbLibraryItem = {
+        id: fullItem.id,
+        type: fullItem.type,
+        content: fullItem.content,
+        platform: fullItem.platform,
+        created_at: fullItem.created_at,
+        title: fullItem.title,
+        // Explicitly exclude: summary, prompts, or any other internal metadata
+      };
+
+      setSelectedText(publicItem);
     } catch (error) {
       console.error("Failed to load full content:", error);
       toast.error("Failed to load content");
@@ -633,7 +688,7 @@ export default function Library() {
               <button
                 onClick={() => {
                   const items = activeTab === "text" ? filteredTextItems : filteredImageItems;
-                  setSelectedIds(new Set(items.map(i => i.id)));
+                  setSelectedIds(new Set(items.map((i: DbLibraryItem | LocalLibraryItem) => i.id)));
                 }}
                 className="px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500 hover:text-zinc-300 transition-colors"
               >
@@ -733,7 +788,7 @@ export default function Library() {
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredTextItems.map((item, index) => {
                   const PlatformIcon = item.platform ? platformIcons[item.platform] : FileIcon;
                   const isSelected = selectedIds.has(item.id);
@@ -742,51 +797,42 @@ export default function Library() {
                       key={item.id}
                       onClick={() => isSelectionMode && toggleSelection(item.id)}
                       className={cn(
-                        "bg-zinc-900 border transition-all duration-150 cursor-pointer group",
-                        isSelected 
-                          ? "border-zinc-400 ring-1 ring-zinc-400" 
-                          : "border-zinc-800 hover:border-zinc-700",
+                        "bg-zinc-900/50 rounded-lg border transition-all duration-200 cursor-pointer group",
+                        isSelected
+                          ? "border-zinc-500 shadow-lg shadow-zinc-500/10"
+                          : "border-zinc-800/50 hover:border-zinc-700/50 hover:bg-zinc-900/70",
                         isSelectionMode && "cursor-pointer"
                       )}
                       style={{ animationDelay: `${index * 30}ms` }}
                     >
-                      {/* Top bar */}
-                      <div className={cn(
-                        "h-1 transition-colors",
-                        isSelected 
-                          ? "bg-zinc-400" 
-                          : "bg-gradient-to-r from-zinc-700 via-zinc-600 to-zinc-700"
-                      )} />
-                      
-                      <div className="p-4">
-                        <div className="flex items-center gap-2 mb-2">
+                      <div className="p-6">
+                        <div className="flex items-center gap-3 mb-4">
                           {isSelectionMode && (
-                            <CheckboxIcon 
+                            <CheckboxIcon
                               className={cn(
-                                "w-4 h-4 transition-colors",
+                                "w-4 h-4 transition-colors flex-shrink-0",
                                 isSelected ? "text-zinc-300" : "text-zinc-600"
-                              )} 
-                              checked={isSelected} 
+                              )}
+                              checked={isSelected}
                             />
                           )}
-                          <PlatformIcon className="w-4 h-4 text-zinc-500" />
-                          <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-wider">
+                          <PlatformIcon className="w-4 h-4 text-zinc-500 flex-shrink-0" />
+                          <span className="text-xs text-zinc-500">
                             {getPlatformLabel(item.platform)}
                           </span>
-                          <div className="flex-1 h-px bg-zinc-800" />
-                          <span className="font-mono text-[10px] text-zinc-700">
+                          <span className="text-xs text-zinc-700 ml-auto">
                             {new Date(item.created_at).toLocaleDateString()}
                           </span>
                         </div>
-                        
+
                         {item.title && (
-                          <h3 className="font-mono text-sm text-zinc-200 mb-2 truncate">{item.title}</h3>
+                          <h3 className="text-base text-zinc-200 mb-3 font-medium">{item.title}</h3>
                         )}
-                        
-                        <p className="text-sm text-zinc-400 line-clamp-3 mb-4 whitespace-pre-wrap leading-relaxed">
-                          {item.content}
+
+                        <p className="text-sm text-zinc-400 line-clamp-4 mb-5 leading-relaxed">
+                          {cleanLinkedInContent(item.content, item.platform)}
                         </p>
-                        
+
                         {!isSelectionMode && (
                           <div className="flex items-center gap-2">
                             <button
@@ -794,16 +840,17 @@ export default function Library() {
                                 e.stopPropagation();
                                 handleViewFull(item);
                               }}
-                              className="px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 transition-colors border-l-2 border-transparent hover:border-zinc-500"
+                              className="flex-1 px-4 py-2 text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-800/50 hover:bg-zinc-800 rounded transition-colors"
                             >
                               View Full
                             </button>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleCopy(item.content, item.id);
+                                handleCopy(cleanLinkedInContent(item.content, item.platform), item.id);
                               }}
-                              className="p-1.5 bg-zinc-800 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700 transition-colors"
+                              className="p-2 bg-zinc-800/50 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 rounded transition-colors"
+                              title="Copy"
                             >
                               {copiedId === item.id ? (
                                 <CheckIcon className="w-4 h-4" />
@@ -817,7 +864,8 @@ export default function Library() {
                                 handleDeleteText(item.id);
                               }}
                               disabled={deleting === item.id}
-                              className="p-1.5 bg-zinc-800 text-zinc-600 hover:text-red-400 hover:bg-red-950/30 transition-colors ml-auto disabled:opacity-50"
+                              className="p-2 bg-zinc-800/50 text-zinc-600 hover:text-red-400 hover:bg-red-950/30 rounded transition-colors disabled:opacity-50"
+                              title="Delete"
                             >
                               {deleting === item.id ? (
                                 <LoaderIcon className="w-4 h-4" />
@@ -1014,65 +1062,66 @@ export default function Library() {
 
       {/* Text Preview Dialog */}
       <Dialog open={!!selectedText} onOpenChange={(open) => !open && setSelectedText(null)}>
-        <DialogContent className="max-w-2xl w-full bg-zinc-950 border-zinc-800 p-0 overflow-hidden">
+        <DialogContent className="max-w-3xl w-full bg-zinc-950 border-zinc-800/50 rounded-lg p-0 overflow-hidden">
           <DialogTitle className="sr-only">Content Preview</DialogTitle>
           {selectedText && (
-            <div>
-              <div className="h-1 bg-gradient-to-r from-zinc-700 via-zinc-500 to-zinc-700" />
-              
-              <div className="p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  {selectedText.platform && (
+            <div className="p-8">
+              <div className="flex items-center gap-3 mb-6 pb-4 border-b border-zinc-800/50">
+                {selectedText.platform && (
+                  <>
+                    {(() => {
+                      const PlatformIcon = platformIcons[selectedText.platform] || FileIcon;
+                      return <PlatformIcon className="w-4 h-4 text-zinc-500" />;
+                    })()}
+                    <span className="text-sm text-zinc-500">
+                      {getPlatformLabel(selectedText.platform)}
+                    </span>
+                  </>
+                )}
+                <span className="text-xs text-zinc-700 ml-auto">
+                  {new Date(selectedText.created_at).toLocaleDateString()}
+                </span>
+              </div>
+
+              {selectedText.title && (
+                <h2 className="text-xl text-zinc-200 mb-6 font-medium">{selectedText.title}</h2>
+              )}
+
+              <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                <p className="text-base text-zinc-300 whitespace-pre-wrap leading-relaxed">
+                  {cleanLinkedInContent(selectedText.content, selectedText.platform)}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 mt-8 pt-6 border-t border-zinc-800/50">
+                <button
+                  onClick={() => handleCopy(cleanLinkedInContent(selectedText.content, selectedText.platform), selectedText.id)}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-zinc-800 text-zinc-200 hover:bg-zinc-700 rounded transition-colors text-sm"
+                >
+                  {copiedId === selectedText.id ? (
                     <>
-                      {(() => {
-                        const PlatformIcon = platformIcons[selectedText.platform] || FileIcon;
-                        return <PlatformIcon className="w-4 h-4 text-zinc-500" />;
-                      })()}
-                      <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-wider">
-                        {getPlatformLabel(selectedText.platform)}
-                      </span>
+                      <CheckIcon className="w-4 h-4" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <CopyIcon className="w-4 h-4" />
+                      Copy
                     </>
                   )}
-                  <div className="flex-1 h-px bg-zinc-800" />
-                  <span className="font-mono text-[10px] text-zinc-700">
-                    {new Date(selectedText.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-                
-                <div className="max-h-[60vh] overflow-y-auto">
-                  <p className="text-zinc-300 whitespace-pre-wrap leading-relaxed">{selectedText.content}</p>
-                </div>
-                
-                <div className="flex items-center gap-2 mt-6 pt-4 border-t border-zinc-800">
-                  <button
-                    onClick={() => handleCopy(selectedText.content, selectedText.id)}
-                    className="flex items-center gap-2 px-4 py-2 bg-zinc-200 text-zinc-900 hover:bg-zinc-100 transition-colors font-mono text-[11px] uppercase tracking-wider"
-                  >
-                    {copiedId === selectedText.id ? (
-                      <>
-                        <CheckIcon className="w-4 h-4" />
-                        Copied
-                      </>
-                    ) : (
-                      <>
-                        <CopyIcon className="w-4 h-4" />
-                        Copy
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => handleDeleteText(selectedText.id)}
-                    disabled={deleting === selectedText.id}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white hover:bg-red-600 transition-colors font-mono text-[11px] uppercase tracking-wider disabled:opacity-50"
-                  >
-                    {deleting === selectedText.id ? (
-                      <LoaderIcon className="w-4 h-4" />
-                    ) : (
-                      <TrashIcon className="w-4 h-4" />
-                    )}
-                    Delete
-                  </button>
-                </div>
+                </button>
+                <button
+                  onClick={() => handleDeleteText(selectedText.id)}
+                  disabled={deleting === selectedText.id}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded transition-colors text-sm disabled:opacity-50"
+                >
+                  {deleting === selectedText.id ? (
+                    <LoaderIcon className="w-4 h-4" />
+                  ) : (
+                    <TrashIcon className="w-4 h-4" />
+                  )}
+                  Delete
+                </button>
               </div>
             </div>
           )}
