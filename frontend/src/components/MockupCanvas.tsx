@@ -65,8 +65,6 @@ export const MockupCanvas = forwardRef<HTMLElement, MockupCanvasProps>(
       reader.readAsDataURL(file);
     };
 
-    const transformStyle = `perspective(1000px) rotateY(${settings.imageRotateY}deg) rotateX(${settings.imageRotateX}deg)`;
-
     const isImageBackground = settings.backgroundColor.startsWith('data:') || 
                               settings.backgroundColor.startsWith('http') || 
                               settings.backgroundColor.startsWith('/') ||
@@ -125,35 +123,20 @@ export const MockupCanvas = forwardRef<HTMLElement, MockupCanvasProps>(
             />
           )}
           {image ? (
-            <div
-              className="absolute inset-0 flex items-center justify-center"
-              style={{
-                perspective: '2000px',
-                perspectiveOrigin: 'center center',
-              }}
-            >
-              <div
-                className="flex items-center justify-center"
+            <div className="absolute inset-0 flex items-center justify-center">
+              <img
+                src={image.src}
+                alt={image.name}
+                className={cn(
+                  "max-w-full max-h-full object-contain",
+                  settings.shadow && "device-shadow"
+                )}
                 style={{
-                  transformStyle: 'preserve-3d',
-                  transform: `rotateY(${settings.imageRotateY}deg) rotateX(${settings.imageRotateX}deg)`,
-                  backfaceVisibility: 'visible',
+                  borderRadius: settings.imageRadius,
+                  transform: `scale(${settings.imageScale / 100})`,
+                  opacity: 1,
                 }}
-              >
-                <img
-                  src={image.src}
-                  alt={image.name}
-                  className={cn(
-                    "max-w-full max-h-full object-contain",
-                    settings.shadow && "device-shadow"
-                  )}
-                  style={{
-                    borderRadius: settings.imageRadius,
-                    transform: `scale(${settings.imageScale / 100})`,
-                    opacity: 1,
-                  }}
-                />
-              </div>
+              />
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center gap-3">
@@ -209,49 +192,38 @@ export const MockupCanvas = forwardRef<HTMLElement, MockupCanvasProps>(
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           />
         )}
-        {/* Perspective wrapper */}
+        {/* Browser frame wrapper */}
         <div
           className="flex items-center justify-center w-full p-8"
           style={{
             maxWidth: `${settings.browserScale}%`,
-            perspective: '2000px',
-            perspectiveOrigin: 'center center',
           }}
         >
-          {/* Transform wrapper */}
-          <div
-            style={{
-              transformStyle: 'preserve-3d',
-              transform: `rotateY(${settings.imageRotateY}deg) rotateX(${settings.imageRotateX}deg)`,
-              backfaceVisibility: 'visible',
-            }}
+          <DeviceFrame
+            deviceType={settings.deviceType}
+            deviceColor={settings.deviceColor}
+            className={cn(
+              settings.shadow && "device-shadow"
+            )}
           >
-            <DeviceFrame
-              deviceType={settings.deviceType}
-              deviceColor={settings.deviceColor}
-              className={cn(
-                settings.shadow && "device-shadow"
-              )}
-            >
-              {image ? (
-                <img
-                  src={image.src}
-                  alt={image.name}
-                  className="w-full h-full object-cover rounded-b-[10px]"
-                  style={{ opacity: 1 }}
-                />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-                  <div className="w-12 h-12 border border-zinc-500 flex items-center justify-center">
-                    <Upload className="w-5 h-5 text-zinc-400" />
-                  </div>
-                  <p className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">
-                    {isDragging ? "Release to upload" : "Drop image or click"}
-                  </p>
+            {image ? (
+              <img
+                src={image.src}
+                alt={image.name}
+                className="w-full h-full object-cover"
+                style={{ opacity: 1 }}
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                <div className="w-12 h-12 border border-zinc-500 flex items-center justify-center">
+                  <Upload className="w-5 h-5 text-zinc-400" />
                 </div>
-              )}
-            </DeviceFrame>
-          </div>
+                <p className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">
+                  {isDragging ? "Release to upload" : "Drop image or click"}
+                </p>
+              </div>
+            )}
+          </DeviceFrame>
         </div>
       </label>
     );

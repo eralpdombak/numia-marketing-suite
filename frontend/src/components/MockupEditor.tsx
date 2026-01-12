@@ -3,7 +3,7 @@ import { MockupCanvas } from "./MockupCanvas";
 import { ControlPanel } from "./ControlPanel";
 import { Canvas3DRenderer } from "./Canvas3DRenderer";
 import { MockupSettings, UploadedImage, SavedPreset } from "@/types/mockup";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Trash2 } from "lucide-react";
 import html2canvas from "html2canvas";
 import bg1 from "@/assets/backgrounds/bg-1.svg";
@@ -23,8 +23,6 @@ const defaultSettings: MockupSettings = {
   imageRadius: 0,
   imageScale: 80,
   browserScale: 80,
-  imageRotateY: 0,
-  imageRotateX: 0,
   shadow: true,
   deviceColor: 'black',
   brandingPosition: 'top-left',
@@ -69,7 +67,7 @@ export function MockupEditor() {
     setImage(null);
   }, []);
 
-  const captureCanvas = useCallback(async (): Promise<string | null> => {
+  const captureCanvas = useCallback(async (format: 'png' | 'jpeg' = 'png'): Promise<string | null> => {
     // Try to use canvas-based renderer first (better quality)
     if (image && exportCanvasRef.current) {
       try {
@@ -85,8 +83,11 @@ export function MockupEditor() {
         }
 
         console.log('[Capture] Canvas dimensions:', exportCanvasRef.current.width, 'x', exportCanvasRef.current.height);
-        const dataUrl = exportCanvasRef.current.toDataURL('image/png', 1.0);
-        console.log('[Capture] Canvas export complete, length:', dataUrl.length);
+        // Use PNG for exports (lossless), JPEG for library saves (smaller size)
+        const dataUrl = format === 'png'
+          ? exportCanvasRef.current.toDataURL('image/png')
+          : exportCanvasRef.current.toDataURL('image/jpeg', 0.95);
+        console.log('[Capture] Canvas export complete, format:', format, 'length:', dataUrl.length);
         return dataUrl;
       } catch (error) {
         console.error("[Capture] Canvas failed, falling back to html2canvas:", error);
@@ -135,7 +136,10 @@ export function MockupEditor() {
 
       console.log('[Capture] Canvas created:', canvas.width, 'x', canvas.height);
 
-      const dataUrl = canvas.toDataURL('image/png', 1.0);
+      // Use PNG for exports (lossless), JPEG for library saves
+      const dataUrl = format === 'png'
+        ? canvas.toDataURL('image/png')
+        : canvas.toDataURL('image/jpeg', 0.95);
       console.log('[Capture] Data URL length:', dataUrl.length);
 
       return dataUrl;
@@ -144,7 +148,7 @@ export function MockupEditor() {
       toast.error(`Capture failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return null;
     }
-  }, [settings.imageRotateY, settings.imageRotateX, image]);
+  }, [image]);
 
   const handleExportClick = useCallback(() => {
     setTitleInput("");
@@ -167,15 +171,16 @@ export function MockupEditor() {
     if (pendingAction === "export") {
       setIsExporting(true);
       try {
-        const dataUrl = await captureCanvas();
+        // Use PNG for exports - highest quality
+        const dataUrl = await captureCanvas('png');
         if (!dataUrl) throw new Error("Capture failed");
-        
+
         const link = document.createElement('a');
         const filename = title ? `${title.replace(/[^a-zA-Z0-9-_]/g, '-')}.png` : `mockup-${Date.now()}.png`;
         link.download = filename;
         link.href = dataUrl;
         link.click();
-        
+
         toast.success("Exported");
       } catch (error) {
         toast.error("Export failed");
@@ -187,7 +192,8 @@ export function MockupEditor() {
       setIsSavingToLibrary(true);
       try {
         console.log('[MockupEditor] Starting save to library...');
-        const dataUrl = await captureCanvas();
+        // Use JPEG for library - smaller file size for localStorage
+        const dataUrl = await captureCanvas('jpeg');
 
         if (!dataUrl) {
           console.error('[MockupEditor] captureCanvas returned null');
@@ -208,6 +214,7 @@ export function MockupEditor() {
         console.log('[MockupEditor] Saving image to localStorage:', newImage.id, 'Total images:', savedImages.length);
 
         // Try to save, if quota exceeded, remove oldest images
+        let quotaHandled = false;
         try {
           localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(savedImages));
           console.log('[MockupEditor] Image saved successfully');
@@ -220,7 +227,7 @@ export function MockupEditor() {
             try {
               localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(savedImages));
               console.log('[MockupEditor] Saved after removing old images. Remaining:', savedImages.length);
-              toast.success("Saved (removed oldest images to make space)");
+              quotaHandled = true;
               break;
             } catch (e) {
               // Still too big, keep removing
@@ -241,7 +248,12 @@ export function MockupEditor() {
         // Dispatch custom event to notify other components
         window.dispatchEvent(new Event('localStorageUpdate'));
 
-        toast.success("Saved to library");
+        // Show single notification
+        if (quotaHandled) {
+          toast.success("Saved (removed oldest to make space)");
+        } else {
+          toast.success("Saved to library");
+        }
       } catch (error) {
         toast.error(`Failed to save: ${error instanceof Error ? error.message : 'Unknown error'}`);
         console.error('[MockupEditor] Save error:', error);
@@ -288,14 +300,14 @@ export function MockupEditor() {
 
   return (
     <div className="min-h-screen pt-14">
-      {/* Hidden canvas-based 3D renderer for perfect exports */}
+      {/* Hidden canvas-based renderer for exports */}
       {image && (
         <Canvas3DRenderer
           settings={settings}
           image={image}
           backgroundImage={isImageBackground ? settings.backgroundColor : undefined}
-          width={2400}
-          height={1500}
+          width={3840}
+          height={2400}
           onCanvasReady={(canvas) => {
             console.log('[MockupEditor] Canvas ready callback triggered');
             exportCanvasRef.current = canvas;
@@ -307,35 +319,12 @@ export function MockupEditor() {
         {/* Canvas Area */}
         <div className="flex-1 p-8 md:p-12 flex flex-col justify-center items-center bg-background">
           <div className="w-full max-w-4xl">
-            {/* Technical frame */}
-            <div className="relative p-5 overflow-visible">
-              {/* Top line with gap */}
-              <div className="absolute top-2 left-2 w-8 h-px bg-zinc-600 pointer-events-none" />
-              <div className="absolute top-2 left-12 right-12 h-px bg-zinc-800/40 pointer-events-none" />
-              <div className="absolute top-2 right-2 w-8 h-px bg-zinc-600 pointer-events-none" />
-              
-              {/* Bottom line with gap */}
-              <div className="absolute bottom-2 left-2 w-8 h-px bg-zinc-600 pointer-events-none" />
-              <div className="absolute bottom-2 left-12 right-12 h-px bg-zinc-800/40 pointer-events-none" />
-              <div className="absolute bottom-2 right-2 w-8 h-px bg-zinc-600 pointer-events-none" />
-              
-              {/* Left line with gap */}
-              <div className="absolute left-2 top-2 h-8 w-px bg-zinc-600 pointer-events-none" />
-              <div className="absolute left-2 top-12 bottom-12 w-px bg-zinc-800/40 pointer-events-none" />
-              <div className="absolute left-2 bottom-2 h-8 w-px bg-zinc-600 pointer-events-none" />
-              
-              {/* Right line with gap */}
-              <div className="absolute right-2 top-2 h-8 w-px bg-zinc-600 pointer-events-none" />
-              <div className="absolute right-2 top-12 bottom-12 w-px bg-zinc-800/40 pointer-events-none" />
-              <div className="absolute right-2 bottom-2 h-8 w-px bg-zinc-600 pointer-events-none" />
-              
-              <MockupCanvas
-                ref={canvasRef}
-                settings={settings}
-                image={image}
-                onImageUpload={handleImageUpload}
-              />
-            </div>
+            <MockupCanvas
+              ref={canvasRef}
+              settings={settings}
+              image={image}
+              onImageUpload={handleImageUpload}
+            />
             <div className="h-14 flex items-center justify-center pt-4">
               {image && (
                 <button
@@ -373,7 +362,6 @@ export function MockupEditor() {
       <Dialog open={showTitleDialog} onOpenChange={(open) => !open && setShowTitleDialog(false)}>
         <DialogContent className="max-w-md bg-zinc-950 border-zinc-800 p-0 overflow-hidden">
           <DialogTitle className="sr-only">Name your mockup</DialogTitle>
-          <div className="h-1 bg-gradient-to-r from-zinc-700 via-zinc-500 to-zinc-700" />
           <div className="p-6">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-1.5 h-1.5 bg-zinc-500" />

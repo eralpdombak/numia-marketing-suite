@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { NavigationOverlay, useNavigation } from "@/components/NavigationOverlay";
 import { CompassIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 export default function Home() {
   const nav = useNavigation();
+  const location = useLocation();
   const [compassState, setCompassState] = useState<
     'idle' | 'start' | 'flying' | 'centered' | 'hidden' | 'returning' | 'landing'
   >('idle');
@@ -39,21 +41,55 @@ export default function Home() {
         const rect = compassButtonRef.current.getBoundingClientRect();
         setCompassRect(rect);
       }
-      
+
       setCompassState('returning');
-      
+
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           setCompassState('landing');
         });
       });
-      
+
       setTimeout(() => {
         setCompassState('idle');
         setCompassRect(null);
       }, 500);
     }
   }, [nav.isOpen]);
+
+  // Auto-open navigation after login
+  useEffect(() => {
+    const state = location.state as { autoOpenNav?: boolean };
+    if (state?.autoOpenNav && compassButtonRef.current) {
+      // Small delay to let the page render
+      setTimeout(() => {
+        if (compassButtonRef.current) {
+          const rect = compassButtonRef.current.getBoundingClientRect();
+          setCompassRect(rect);
+
+          setCompassState('start');
+
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              setCompassState('flying');
+            });
+          });
+
+          setTimeout(() => {
+            setCompassState('centered');
+          }, 450);
+
+          setTimeout(() => {
+            setCompassState('hidden');
+            nav.open();
+          }, 650);
+        }
+      }, 100);
+
+      // Clear the state so it doesn't trigger again on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const getTransformStyle = (): React.CSSProperties => {
     if (!compassRect) return {};
@@ -165,9 +201,11 @@ export default function Home() {
           onClick={handleCompassClick}
           disabled={compassState !== 'idle'}
           className={cn(
-            "relative group focus-ring transition-all duration-500",
+            "relative group focus-ring",
             "w-40 h-40 md:w-48 md:h-48 lg:w-56 lg:h-56",
-            compassState !== 'idle' ? "opacity-0 pointer-events-none" : "opacity-100"
+            compassState !== 'idle'
+              ? "opacity-0 pointer-events-none transition-none"
+              : "opacity-100 transition-all duration-500"
           )}
         >
           {/* Compass icon */}

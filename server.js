@@ -8,6 +8,7 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs').promises;
 const path = require('path');
+const { execSync } = require('child_process');
 
 const app = express();
 const PORT = 3001;
@@ -162,6 +163,71 @@ app.delete('/api/content', async (req, res) => {
 });
 
 /**
+ * GET /api/changelog
+ * Returns parsed changelog from CHANGELOG.md
+ */
+app.get('/api/changelog', async (req, res) => {
+  try {
+    const changelogPath = path.join(__dirname, 'CHANGELOG.md');
+    const content = await fs.readFile(changelogPath, 'utf-8');
+
+    // Parse markdown changelog
+    const entries = [];
+    const lines = content.split('\n');
+    let currentDate = null;
+    let currentSection = null;
+    let currentChanges = [];
+
+    for (const line of lines) {
+      // Match date headers like ## [2025-01-11]
+      const dateMatch = line.match(/^## \[(.+?)\]/);
+      if (dateMatch) {
+        // Save previous entry
+        if (currentDate && currentChanges.length > 0) {
+          entries.push({
+            date: currentDate,
+            changes: currentChanges
+          });
+        }
+        currentDate = dateMatch[1];
+        currentChanges = [];
+        currentSection = null;
+        continue;
+      }
+
+      // Match section headers like ### Added
+      const sectionMatch = line.match(/^### (.+)/);
+      if (sectionMatch) {
+        currentSection = sectionMatch[1].toLowerCase();
+        continue;
+      }
+
+      // Match bullet points like - Something changed
+      const changeMatch = line.match(/^- (.+)/);
+      if (changeMatch && currentSection && currentDate) {
+        currentChanges.push({
+          type: currentSection,
+          text: changeMatch[1]
+        });
+      }
+    }
+
+    // Add last entry
+    if (currentDate && currentChanges.length > 0) {
+      entries.push({
+        date: currentDate,
+        changes: currentChanges
+      });
+    }
+
+    res.json(entries);
+  } catch (error) {
+    console.error('Error reading changelog:', error);
+    res.status(500).json({ error: 'Failed to read changelog' });
+  }
+});
+
+/**
  * GET /health
  * Health check endpoint
  */
@@ -183,6 +249,7 @@ app.listen(PORT, () => {
   console.log('');
   console.log('Endpoints:');
   console.log(`  GET    /health            - Health check`);
+  console.log(`  GET    /api/changelog     - Git commit history`);
   console.log(`  GET    /api/content       - List all content`);
   console.log(`  GET    /api/content/:id   - Get specific content`);
   console.log(`  DELETE /api/content/:id   - Delete content`);

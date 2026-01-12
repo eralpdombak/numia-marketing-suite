@@ -14,10 +14,10 @@ export function Header() {
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-b border-border">
-        <div className="container mx-auto px-6 h-14 flex items-center">
+        <div className="container mx-auto px-6 h-14 flex items-center justify-between">
           {/* Breadcrumb */}
           <div className="flex items-center gap-1.5 text-sm">
-            <span 
+            <span
               className="font-bold text-foreground/90 cursor-pointer hover:text-foreground transition-colors duration-200"
               onClick={() => setIsOpen(true)}
             >
@@ -34,7 +34,7 @@ export function Header() {
           </div>
 
           {/* Right side status */}
-          <div className="ml-auto flex items-center gap-4">
+          <div className="flex items-center gap-4">
             <div className="hidden md:flex items-center gap-2">
               <div className="status-online" />
               <span className="font-mono text-2xs text-muted-foreground uppercase tracking-wider">

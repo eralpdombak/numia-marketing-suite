@@ -153,10 +153,10 @@ export function ControlPanel({
               key={type}
               onClick={() => onSettingsChange({ deviceType: type })}
               className={cn(
-                "flex-1 py-2 px-4 text-xs font-mono uppercase tracking-wider transition-all duration-100 border-l-2",
+                "flex-1 py-2 px-4 text-xs font-mono uppercase tracking-wider transition-all duration-100",
                 settings.deviceType === type
-                  ? "bg-zinc-300 text-zinc-900 border-zinc-400"
-                  : "bg-zinc-900 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 border-transparent"
+                  ? "bg-zinc-300 text-zinc-900"
+                  : "bg-zinc-900 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
               )}
             >
               {label}
@@ -197,49 +197,6 @@ export function ControlPanel({
           />
         </div>
       )}
-
-      {/* 3D Rotation Controls */}
-      <div className="space-y-3">
-        <SectionLabel>3D Rotation</SectionLabel>
-        
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] text-zinc-600 font-mono uppercase">X-Axis</span>
-            <span className="text-[10px] text-zinc-500 font-mono tabular-nums bg-zinc-800 px-2 py-0.5">{settings.imageRotateY}°</span>
-          </div>
-          <Slider
-            value={[settings.imageRotateY]}
-            onValueChange={([value]) => onSettingsChange({ imageRotateY: value })}
-            onValueCommit={([value]) => {
-              if (Math.abs(value) <= 3) {
-                onSettingsChange({ imageRotateY: 0 });
-              }
-            }}
-            min={-45}
-            max={45}
-            step={1}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] text-zinc-600 font-mono uppercase">Y-Axis</span>
-            <span className="text-[10px] text-zinc-500 font-mono tabular-nums bg-zinc-800 px-2 py-0.5">{settings.imageRotateX}°</span>
-          </div>
-          <Slider
-            value={[settings.imageRotateX]}
-            onValueChange={([value]) => onSettingsChange({ imageRotateX: value })}
-            onValueCommit={([value]) => {
-              if (Math.abs(value) <= 3) {
-                onSettingsChange({ imageRotateX: 0 });
-              }
-            }}
-            min={-45}
-            max={45}
-            step={1}
-          />
-        </div>
-      </div>
 
       {/* Radius Controls */}
       {settings.deviceType === 'none' && (
@@ -286,41 +243,40 @@ export function ControlPanel({
           <ChevronIcon className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400" open={showBackgrounds} />
         </button>
         
-        <div className={cn(
-          "space-y-2 overflow-hidden transition-all duration-200",
-          showBackgrounds ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
-        )}>
-          {/* Solid Black option */}
-          <button
-            onClick={() => onSettingsChange({ backgroundColor: "#000000" })}
-            className={cn(
-              "w-full py-2 px-3 border text-[11px] font-mono uppercase tracking-wider transition-all duration-100 border-l-2",
-              settings.backgroundColor === "#000000"
-                ? "border-zinc-500 border-l-zinc-400 bg-zinc-800 text-zinc-200"
-                : "border-zinc-800 border-l-transparent bg-zinc-900 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700"
-            )}
-          >
-            Solid Black
-          </button>
-          
-          {/* Gradient presets */}
-          <div className="grid grid-cols-2 gap-px bg-zinc-800 p-px">
-            {backgroundPresets.map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => onSettingsChange({ backgroundColor: preset.image })}
-                className={cn(
-                  "aspect-video overflow-hidden transition-all duration-100",
-                  settings.backgroundColor === preset.image
-                    ? "ring-1 ring-zinc-400 ring-inset"
-                    : "hover:opacity-80"
-                )}
-              >
-                <img src={preset.image} alt={preset.name} className="w-full h-full object-cover" />
-              </button>
-            ))}
+        {showBackgrounds && (
+          <div className="space-y-2 animate-in slide-in-from-top-2 duration-150">
+            {/* Solid Black option */}
+            <button
+              onClick={() => onSettingsChange({ backgroundColor: "#000000" })}
+              className={cn(
+                "w-full py-2 px-3 border text-[11px] font-mono uppercase tracking-wider transition-all duration-100",
+                settings.backgroundColor === "#000000"
+                  ? "border-zinc-500 bg-zinc-800 text-zinc-200"
+                  : "border-zinc-800 bg-zinc-900 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700"
+              )}
+            >
+              Solid Black
+            </button>
+
+            {/* Gradient presets */}
+            <div className="grid grid-cols-2 gap-2">
+              {backgroundPresets.map((preset) => (
+                <button
+                  key={preset.id}
+                  onClick={() => onSettingsChange({ backgroundColor: preset.image })}
+                  className={cn(
+                    "aspect-video overflow-hidden transition-all duration-100 border",
+                    settings.backgroundColor === preset.image
+                      ? "border-zinc-400"
+                      : "border-zinc-800 hover:border-zinc-700"
+                  )}
+                >
+                  <img src={preset.image} alt={preset.name} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Branding Position */}
@@ -332,10 +288,10 @@ export function ControlPanel({
               key={position}
               onClick={() => onSettingsChange({ brandingPosition: position })}
               className={cn(
-                "py-2 text-xs transition-all duration-100 border-t-2",
+                "py-2 text-xs transition-all duration-100",
                 settings.brandingPosition === position
-                  ? "bg-zinc-300 text-zinc-900 border-zinc-400"
-                  : "bg-zinc-900 text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 border-transparent"
+                  ? "bg-zinc-300 text-zinc-900"
+                  : "bg-zinc-900 text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800"
               )}
             >
               {position === 'none' ? '—' : position === 'top-left' ? '↖' : position === 'top-right' ? '↗' : position === 'bottom-left' ? '↙' : '↘'}
@@ -356,7 +312,7 @@ export function ControlPanel({
               <div key={preset.id} className="flex items-center group">
                 <button
                   onClick={() => onLoadPreset(preset)}
-                  className="flex-1 py-2 px-3 text-[11px] text-left font-mono text-zinc-500 hover:text-zinc-200 bg-zinc-900 hover:bg-zinc-800 transition-all duration-100 truncate uppercase tracking-wider border-l-2 border-transparent hover:border-zinc-600"
+                  className="flex-1 py-2 px-3 text-[11px] text-left font-mono text-zinc-500 hover:text-zinc-200 bg-zinc-900 hover:bg-zinc-800 transition-all duration-100 truncate uppercase tracking-wider"
                 >
                   {preset.name}
                 </button>
@@ -393,7 +349,7 @@ export function ControlPanel({
         ) : (
           <button
             onClick={() => setShowSaveInput(true)}
-            className="w-full py-2 px-3 border border-zinc-800 bg-zinc-900 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 transition-all duration-100 text-[11px] font-mono uppercase tracking-wider flex items-center justify-center gap-2 border-l-2 border-l-transparent hover:border-l-zinc-600"
+            className="w-full py-2 px-3 border border-zinc-800 bg-zinc-900 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 transition-all duration-100 text-[11px] font-mono uppercase tracking-wider flex items-center justify-center gap-2"
           >
             <SaveIcon className="w-3 h-3" />
             Save Current
@@ -406,7 +362,7 @@ export function ControlPanel({
       {/* Export Actions */}
       <div className="space-y-2 pt-2">
         <button
-          className="w-full py-3 px-4 bg-zinc-200 text-zinc-900 font-mono text-xs uppercase tracking-wider transition-all duration-100 hover:bg-zinc-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border-l-2 border-zinc-400"
+          className="w-full py-3 px-4 bg-zinc-200 text-zinc-900 font-mono text-xs uppercase tracking-wider transition-all duration-100 hover:bg-zinc-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           onClick={onExport}
           disabled={isExporting}
         >
@@ -421,7 +377,7 @@ export function ControlPanel({
         </button>
         
         <button
-          className="w-full py-2.5 px-4 border border-zinc-800 bg-zinc-900 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 transition-all duration-100 font-mono text-[11px] uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border-l-2 border-l-transparent hover:border-l-zinc-600"
+          className="w-full py-2.5 px-4 border border-zinc-800 bg-zinc-900 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 transition-all duration-100 font-mono text-[11px] uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           onClick={onSaveToLibrary}
           disabled={isSavingToLibrary}
         >

@@ -8,14 +8,14 @@ interface PageTransitionProps {
 
 export function PageTransition({ children }: PageTransitionProps) {
   const location = useLocation();
-  const [isAnimating, setIsAnimating] = useState(true);
+  const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
     setIsAnimating(true);
-    
+
     const timer = setTimeout(() => {
       setIsAnimating(false);
-    }, 20);
+    }, 50);
 
     return () => clearTimeout(timer);
   }, [location.pathname]);
@@ -23,15 +23,11 @@ export function PageTransition({ children }: PageTransitionProps) {
   return (
     <div
       className={cn(
-        "transition-all duration-500",
-        isAnimating 
-          ? "opacity-0 scale-[0.98]" 
+        "transition-all duration-200 ease-out",
+        isAnimating
+          ? "opacity-0 scale-[0.98]"
           : "opacity-100 scale-100"
       )}
-      style={{ 
-        transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
-        transformOrigin: 'center top'
-      }}
     >
       {children}
     </div>

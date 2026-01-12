@@ -86,7 +86,33 @@ def sync_to_supabase():
     """Sync new content from markdown files to Supabase"""
     index = load_index()
     synced_count = 0
+    deleted_count = 0
 
+    # First pass: Check for deleted files and remove from Supabase
+    tracked_files_copy = dict(index.get("tracked_files", {}))
+    for file_key, file_info in tracked_files_copy.items():
+        # Reconstruct the filepath from the key (it's stored as "synced_{filepath}")
+        filepath = file_key.replace("synced_", "", 1)
+
+        if not os.path.exists(filepath):
+            # File was deleted, remove from Supabase and index
+            supabase_id = file_info.get("supabase_id")
+            if supabase_id:
+                try:
+                    print(f"🗑️  File deleted: {file_info.get('filename')} - removing from backend")
+                    supabase.table("library_items").delete().eq("id", supabase_id).execute()
+                    print(f"  ✓ Removed from Supabase")
+                    deleted_count += 1
+                except Exception as e:
+                    print(f"  ⚠️  Failed to delete from Supabase: {e}")
+
+            # Remove from index regardless
+            del index["tracked_files"][file_key]
+
+    if deleted_count > 0:
+        save_index(index)
+
+    # Second pass: Sync new files
     for platform, directory in OUTPUT_DIRS.items():
         if not os.path.exists(directory):
             print(f"⏭️  Skipping {platform} (directory doesn't exist)")
@@ -172,9 +198,14 @@ def sync_to_supabase():
             except Exception as e:
                 print(f"  ✗ Failed to sync: {e}")
 
-    if synced_count > 0:
+    if synced_count > 0 or deleted_count > 0:
         save_index(index)
-        print(f"\n✅ Synced {synced_count} new item(s) to library")
+        if synced_count > 0 and deleted_count > 0:
+            print(f"\n✅ Synced {synced_count} new item(s), deleted {deleted_count} item(s)")
+        elif synced_count > 0:
+            print(f"\n✅ Synced {synced_count} new item(s) to library")
+        else:
+            print(f"\n✅ Deleted {deleted_count} item(s) from library")
     else:
         print("\n✓ No new content to sync")
 

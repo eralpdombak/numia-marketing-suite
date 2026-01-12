@@ -55,8 +55,12 @@ export function NavigationOverlay({ isOpen, onClose }: NavigationOverlayProps) {
   }, [onClose]);
 
   const handleNavigate = (path: string) => {
-    onClose();
     navigate(path);
+    setContentVisible(false);
+
+    setTimeout(() => {
+      onClose();
+    }, 250);
   };
   
   return (
@@ -66,17 +70,17 @@ export function NavigationOverlay({ isOpen, onClose }: NavigationOverlayProps) {
         isOpen ? "pointer-events-auto" : "pointer-events-none"
       )}
     >
-      {/* Background */}
-      <div 
+      {/* Background - Frosted glass effect */}
+      <div
         className={cn(
-          "absolute inset-0 bg-background transition-opacity duration-400",
+          "absolute inset-0 bg-background/80 backdrop-blur-xl transition-opacity duration-400",
           contentVisible ? "opacity-100" : "opacity-0"
         )}
         onClick={onClose}
       />
 
       {/* Subtle grid overlay */}
-      <div 
+      <div
         className={cn(
           "absolute inset-0 transition-opacity duration-500",
           contentVisible ? "opacity-100" : "opacity-0"
@@ -88,12 +92,13 @@ export function NavigationOverlay({ isOpen, onClose }: NavigationOverlayProps) {
           `,
           backgroundSize: '60px 60px',
         }}
+        onClick={onClose}
       />
 
       {/* Content */}
       <div className="relative h-full flex flex-col">
         {/* Header bar */}
-        <div 
+        <div
           className={cn(
             "border-b border-border/50 transition-all duration-400",
             contentVisible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"
@@ -123,12 +128,13 @@ export function NavigationOverlay({ isOpen, onClose }: NavigationOverlayProps) {
         </div>
 
         {/* Main control grid */}
-        <div className="flex-1 container mx-auto px-6 py-12 flex items-center justify-center">
-          <div 
+        <div className="flex-1 container mx-auto px-6 py-12 flex items-center justify-center" onClick={onClose}>
+          <div
             className={cn(
               "w-full max-w-4xl transition-all duration-500",
               contentVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"
             )}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Module grid */}
             <div className="grid grid-cols-3 gap-3">
@@ -144,11 +150,11 @@ export function NavigationOverlay({ isOpen, onClose }: NavigationOverlayProps) {
                     onMouseEnter={() => setHoveredIndex(index)}
                     onMouseLeave={() => setHoveredIndex(null)}
                     className={cn(
-                      "group relative aspect-square p-4 transition-all duration-300 focus-ring",
+                      "group relative aspect-square p-4 transition-all duration-100 focus-ring",
                       "border flex flex-col items-center justify-center gap-3",
-                      isActive 
-                        ? "bg-muted/30 border-muted-foreground/40" 
-                        : "bg-card/30 border-border/50 hover:bg-muted/20 hover:border-muted-foreground/30"
+                      isActive
+                        ? "bg-muted/30 border-muted-foreground/40"
+                        : "bg-card/30 border-border/50 hover:bg-muted/30 hover:border-muted-foreground/40 hover:scale-[1.02] hover:shadow-lg hover:shadow-muted/20"
                     )}
                     style={{ 
                       transitionDelay: contentVisible ? `${index * 40}ms` : "0ms",
@@ -172,38 +178,50 @@ export function NavigationOverlay({ isOpen, onClose }: NavigationOverlayProps) {
                     </div>
                     
                     {/* Icon container */}
-                    <div 
+                    <div
                       className={cn(
-                        "w-12 h-12 border flex items-center justify-center transition-all duration-300",
-                        isActive 
-                          ? "border-muted-foreground/50 bg-muted/30" 
-                          : isHovered 
-                            ? "border-muted-foreground/40 bg-muted/20" 
+                        "w-12 h-12 border flex items-center justify-center transition-all duration-100",
+                        isActive
+                          ? "border-muted-foreground/50 bg-muted/30"
+                          : isHovered
+                            ? "border-muted-foreground/50 bg-muted/30 scale-110"
                             : "border-border/60"
                       )}
                     >
-                      <Icon 
+                      <Icon
                         className={cn(
-                          "w-5 h-5 transition-colors duration-300",
-                          isActive ? "text-foreground" : isHovered ? "text-foreground" : "text-muted-foreground"
+                          "w-5 h-5 transition-all duration-100",
+                          isActive
+                            ? "text-foreground"
+                            : isHovered
+                              ? "text-foreground brightness-125"
+                              : "text-muted-foreground"
                         )}
                       />
                     </div>
 
                     {/* Label */}
                     <div className="text-center">
-                      <div 
+                      <div
                         className={cn(
-                          "font-mono text-[11px] uppercase tracking-wider transition-colors duration-300 mb-0.5",
-                          isActive ? "text-foreground" : isHovered ? "text-foreground" : "text-muted-foreground"
+                          "font-mono text-[11px] uppercase tracking-wider transition-all duration-100 mb-0.5",
+                          isActive
+                            ? "text-foreground"
+                            : isHovered
+                              ? "text-foreground brightness-110"
+                              : "text-muted-foreground"
                         )}
                       >
                         {item.label}
                       </div>
-                      <div 
+                      <div
                         className={cn(
-                          "font-mono text-[9px] uppercase tracking-wider transition-colors duration-300",
-                          isActive ? "text-muted-foreground" : "text-muted-foreground/50"
+                          "font-mono text-[9px] uppercase tracking-wider transition-all duration-100",
+                          isActive
+                            ? "text-muted-foreground"
+                            : isHovered
+                              ? "text-muted-foreground brightness-110"
+                              : "text-muted-foreground/50"
                         )}
                       >
                         {item.description}
@@ -222,7 +240,7 @@ export function NavigationOverlay({ isOpen, onClose }: NavigationOverlayProps) {
         </div>
 
         {/* Footer status bar */}
-        <div 
+        <div
           className={cn(
             "border-t border-border/50 transition-all duration-400 delay-200",
             contentVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
@@ -243,10 +261,10 @@ export function NavigationOverlay({ isOpen, onClose }: NavigationOverlayProps) {
                 </span>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
                 <div className="flex items-center gap-1">
                   {[...Array(4)].map((_, i) => (
-                    <div 
+                    <div
                       key={i}
                       className="w-1 h-3 bg-muted-foreground/20"
                       style={{ height: `${8 + i * 3}px` }}

@@ -91,16 +91,16 @@ export function CompassIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={cn("w-5 h-5", className)}>
       {/* Outer circle */}
-      <circle cx="12" cy="12" r="11" strokeWidth="0.75" />
+      <circle cx="12" cy="12" r="11" strokeWidth="0.75" opacity="1" />
 
       {/* Inner circle */}
       <circle cx="12" cy="12" r="7" strokeWidth="0.4" strokeOpacity="0.5" />
 
       {/* Cardinal direction lines - outside outer circle only, no overlap */}
-      <line x1="12" y1="0" x2="12" y2="1" strokeWidth="0.4" />
-      <line x1="12" y1="23" x2="12" y2="24" strokeWidth="0.4" />
-      <line x1="0" y1="12" x2="1" y2="12" strokeWidth="0.4" />
-      <line x1="23" y1="12" x2="24" y2="12" strokeWidth="0.4" />
+      <line x1="12" y1="0" x2="12" y2="1" strokeWidth="0.4" opacity="1" />
+      <line x1="12" y1="23" x2="12" y2="24" strokeWidth="0.4" opacity="1" />
+      <line x1="0" y1="12" x2="1" y2="12" strokeWidth="0.4" opacity="1" />
+      <line x1="23" y1="12" x2="24" y2="12" strokeWidth="0.4" opacity="1" />
 
       {/* NUMIA text */}
       <text

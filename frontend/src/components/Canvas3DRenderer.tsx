@@ -42,17 +42,45 @@ export function Canvas3DRenderer({
       console.error('[Canvas3D] Image load failed:', err);
     };
 
+    // Helper function for rounded rectangles
+    function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    }
+
     img.onload = () => {
       console.log('[Canvas3D] Image loaded successfully');
       // Clear canvas
       ctx.clearRect(0, 0, width, height);
 
-      // Draw background
+      // Scale border radius proportionally to canvas size
+      // Preview canvas is ~896px wide (max-w-4xl), export is 3840px
+      // Scale factor: 3840 / 896 ≈ 4.29
+      const scaleFactor = width / 896;
+      const scaledBorderRadius = (settings.borderRadius || 0) * scaleFactor;
+
+      // Draw background with border radius
+      ctx.save();
+      if (scaledBorderRadius > 0) {
+        roundRect(ctx, 0, 0, width, height, scaledBorderRadius);
+        ctx.clip();
+      }
+
       if (backgroundImage) {
         const bgImg = new Image();
         bgImg.crossOrigin = 'anonymous';
         bgImg.onload = () => {
           ctx.drawImage(bgImg, 0, 0, width, height);
+          ctx.restore();
           drawTransformedImage();
         };
         bgImg.onerror = () => {
@@ -61,6 +89,7 @@ export function Canvas3DRenderer({
             ctx.fillStyle = settings.backgroundColor;
             ctx.fillRect(0, 0, width, height);
           }
+          ctx.restore();
           drawTransformedImage();
         };
         bgImg.src = backgroundImage;
@@ -70,144 +99,219 @@ export function Canvas3DRenderer({
           ctx.fillStyle = settings.backgroundColor;
           ctx.fillRect(0, 0, width, height);
         }
+        ctx.restore();
         drawTransformedImage();
       }
 
       function drawTransformedImage() {
-        ctx.save();
-
-        // Move to center
-        ctx.translate(width / 2, height / 2);
-
-        // Apply 3D perspective transforms using matrix math
-        const rotateY = (settings.imageRotateY || 0) * Math.PI / 180;
-        const rotateX = (settings.imageRotateX || 0) * Math.PI / 180;
-        const scale = settings.deviceType === 'browser'
-          ? (settings.browserScale || 80) / 100
-          : (settings.imageScale || 100) / 100;
-
-        // Apply Y rotation (skew effect)
-        const cosY = Math.cos(rotateY);
-        const sinY = Math.sin(rotateY);
-
-        // Apply X rotation
-        const cosX = Math.cos(rotateX);
-        const sinX = Math.sin(rotateX);
-
-        // Perspective factor (simulates depth)
-        const perspective = 800;
-        const scaleX = cosY;
-        const scaleY = cosX;
-        const skewY = sinY * 0.5; // Horizontal skew from Y rotation
-        const skewX = -sinX * 0.5; // Vertical skew from X rotation
-
-        // Apply transformation matrix
-        ctx.transform(scaleX, skewX, skewY, scaleY, 0, 0);
-        ctx.scale(scale, scale);
-
-        // Calculate image dimensions
+        // Calculate image dimensions with object-contain behavior
         const imgWidth = img.width;
         const imgHeight = img.height;
-        const aspectRatio = imgWidth / imgHeight;
+        const imgAspect = imgWidth / imgHeight;
+        const canvasAspect = width / height;
 
-        let drawWidth = width * 0.6;
-        let drawHeight = drawWidth / aspectRatio;
+        // Calculate max size that fits in canvas (with some padding)
+        const maxWidth = width * 0.9;
+        const maxHeight = height * 0.9;
 
-        if (drawHeight > height * 0.6) {
-          drawHeight = height * 0.6;
-          drawWidth = drawHeight * aspectRatio;
+        let baseWidth: number;
+        let baseHeight: number;
+
+        // Object-contain logic: fit image within canvas bounds
+        if (imgAspect > canvasAspect) {
+          // Image is wider - fit to width
+          baseWidth = maxWidth;
+          baseHeight = baseWidth / imgAspect;
+        } else {
+          // Image is taller - fit to height
+          baseHeight = maxHeight;
+          baseWidth = baseHeight * imgAspect;
         }
 
-        // Apply shadow if needed
-        if (settings.shadow) {
-          ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-          ctx.shadowBlur = 50;
-          ctx.shadowOffsetX = 20;
-          ctx.shadowOffsetY = 20;
-        }
-
-        // If browser mode, draw browser frame first
         if (settings.deviceType === 'browser') {
-          const frameWidth = drawWidth;
-          const frameHeight = drawHeight;
-          const borderRadius = 12;
-          const titleBarHeight = 32;
+          // Browser mode - apply scale directly to base size
+          const browserScale = (settings.browserScale || 80) / 100;
+          const frameWidth = baseWidth * browserScale;
+          const frameHeight = baseHeight * browserScale;
+
+          // Scale all browser chrome elements proportionally to match preview
+          // Preview uses 32px title bar on ~896px canvas
+          // Browser frame radius is FIXED at 11px (Safari-like), NOT controlled by radius slider
+          const browserBorderRadius = 11 * scaleFactor;
+          const titleBarHeight = 32 * scaleFactor;
+          const buttonRadius = 6 * scaleFactor; // Smaller to match Safari
+          const buttonSpacing = 6 * scaleFactor; // Preview uses gap-[6px]
+          const buttonOffsetX = 16 * scaleFactor; // Preview uses left-4 (16px)
+          const urlBarHeight = 18 * scaleFactor;
+          const urlBarWidth = 180 * scaleFactor; // Preview uses w-[180px]
+          const urlBarRadius = 6 * scaleFactor; // Scaled from preview
+          const fontSize = Math.round(9 * scaleFactor); // Preview uses text-[9px]
+
+          ctx.save();
+          ctx.translate(width / 2, height / 2);
+
+          // Apply shadow if needed
+          if (settings.shadow) {
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            ctx.shadowBlur = 60 * scaleFactor;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 20 * scaleFactor;
+          }
 
           // Draw browser window background
           ctx.fillStyle = '#2a2a2e';
-          roundRect(ctx, -frameWidth / 2, -frameHeight / 2 - titleBarHeight, frameWidth, frameHeight + titleBarHeight, borderRadius);
+          roundRect(
+            ctx,
+            -frameWidth / 2,
+            -frameHeight / 2 - titleBarHeight,
+            frameWidth,
+            frameHeight + titleBarHeight,
+            browserBorderRadius
+          );
           ctx.fill();
+
+          // Reset shadow
+          ctx.shadowColor = 'transparent';
 
           // Draw title bar buttons
           const buttonY = -frameHeight / 2 - titleBarHeight / 2;
-          const buttonX = -frameWidth / 2 + 12;
+          const buttonX = -frameWidth / 2 + buttonOffsetX;
 
           ctx.fillStyle = '#ff5f57';
           ctx.beginPath();
-          ctx.arc(buttonX, buttonY, 5, 0, Math.PI * 2);
+          ctx.arc(buttonX, buttonY, buttonRadius, 0, Math.PI * 2);
           ctx.fill();
 
           ctx.fillStyle = '#febc2e';
           ctx.beginPath();
-          ctx.arc(buttonX + 16, buttonY, 5, 0, Math.PI * 2);
+          ctx.arc(buttonX + buttonRadius * 2 + buttonSpacing, buttonY, buttonRadius, 0, Math.PI * 2);
           ctx.fill();
 
           ctx.fillStyle = '#28c840';
           ctx.beginPath();
-          ctx.arc(buttonX + 32, buttonY, 5, 0, Math.PI * 2);
+          ctx.arc(buttonX + (buttonRadius * 2 + buttonSpacing) * 2, buttonY, buttonRadius, 0, Math.PI * 2);
           ctx.fill();
 
           // Draw URL bar
           ctx.fillStyle = '#1c1c1e';
-          roundRect(ctx, -90, -frameHeight / 2 - titleBarHeight / 2 - 9, 180, 18, 4);
+          roundRect(ctx, -urlBarWidth / 2, buttonY - urlBarHeight / 2, urlBarWidth, urlBarHeight, urlBarRadius);
           ctx.fill();
 
+          // URL text
           ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-          ctx.font = '9px system-ui';
+          ctx.font = `${fontSize}px system-ui`;
           ctx.textAlign = 'center';
-          ctx.fillText('numia.xyz', 0, -frameHeight / 2 - titleBarHeight / 2 - 1);
+          ctx.textBaseline = 'middle';
+          ctx.fillText('numia.xyz', 0, buttonY);
 
-          // Draw browser content area with image
-          ctx.fillStyle = '#1c1c1e';
-          roundRect(ctx, -frameWidth / 2, -frameHeight / 2, frameWidth, frameHeight, borderRadius);
-          ctx.fill();
-
+          // Draw browser content area with rounded bottom corners only
           ctx.save();
-          ctx.shadowColor = 'transparent'; // No shadow on image inside browser
-          ctx.clip(); // Clip to rounded rect
+
+          // Create a path with rounded bottom corners only
+          ctx.beginPath();
+          const contentX = -frameWidth / 2;
+          const contentY = -frameHeight / 2;
+
+          // Top edge (straight)
+          ctx.moveTo(contentX, contentY);
+          ctx.lineTo(contentX + frameWidth, contentY);
+
+          // Right edge
+          ctx.lineTo(contentX + frameWidth, contentY + frameHeight - browserBorderRadius);
+
+          // Bottom-right corner (rounded)
+          ctx.quadraticCurveTo(
+            contentX + frameWidth,
+            contentY + frameHeight,
+            contentX + frameWidth - browserBorderRadius,
+            contentY + frameHeight
+          );
+
+          // Bottom edge
+          ctx.lineTo(contentX + browserBorderRadius, contentY + frameHeight);
+
+          // Bottom-left corner (rounded)
+          ctx.quadraticCurveTo(
+            contentX,
+            contentY + frameHeight,
+            contentX,
+            contentY + frameHeight - browserBorderRadius
+          );
+
+          // Left edge
+          ctx.lineTo(contentX, contentY);
+          ctx.closePath();
+          ctx.clip();
+
+          ctx.fillStyle = '#1c1c1e';
+          ctx.fillRect(contentX, contentY, frameWidth, frameHeight);
+
           ctx.drawImage(
             img,
-            -frameWidth / 2,
-            -frameHeight / 2,
+            contentX,
+            contentY,
             frameWidth,
             frameHeight
           );
           ctx.restore();
+
+          ctx.restore();
         } else {
-          // Draw image centered (none mode)
+          // None mode: scale the image directly
+          const imageScale = (settings.imageScale || 80) / 100;
+          const finalWidth = baseWidth * imageScale;
+          const finalHeight = baseHeight * imageScale;
+          // Scale image radius proportionally
+          const scaledImageRadius = (settings.imageRadius || 0) * scaleFactor;
+
+          ctx.save();
+          ctx.translate(width / 2, height / 2);
+
+          // Apply shadow if needed
+          if (settings.shadow) {
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            ctx.shadowBlur = 60;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 20;
+          }
+
+          // Draw image with rounded corners
+          ctx.save();
+          if (scaledImageRadius > 0) {
+            roundRect(ctx, -finalWidth / 2, -finalHeight / 2, finalWidth, finalHeight, scaledImageRadius);
+            ctx.clip();
+          }
+
           ctx.drawImage(
             img,
-            -drawWidth / 2,
-            -drawHeight / 2,
-            drawWidth,
-            drawHeight
+            -finalWidth / 2,
+            -finalHeight / 2,
+            finalWidth,
+            finalHeight
           );
+          ctx.restore();
+
+          ctx.restore();
         }
 
-        ctx.restore();
-
-        // Draw branding if needed (outside transforms)
+        // Draw branding if needed - scaled proportionally to canvas size
         if (settings.brandingPosition !== 'none') {
           ctx.save();
-          ctx.font = 'bold 16px system-ui, sans-serif';
+          // Scale font size to match preview proportions
+          // Preview uses text-base (16px) on ~896px canvas (max-w-4xl)
+          // Ratio: 16/896 ≈ 0.0179, so for 3840px: 3840 * 0.0179 ≈ 69px
+          const fontSize = Math.round(width * 0.018); // Proportional to canvas width
+          ctx.font = `bold ${fontSize}px system-ui, sans-serif`;
           ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
 
           const text = 'NUMIA';
           const metrics = ctx.measureText(text);
-          const padding = 16;
+          // Preview uses left-4 (16px) on ~896px canvas
+          // Ratio: 16/896 ≈ 0.0179
+          const padding = Math.round(width * 0.018); // Proportional padding
 
           let x = padding;
-          let y = padding + 16;
+          let y = padding + fontSize;
 
           if (settings.brandingPosition === 'top-right') {
             x = width - metrics.width - padding;
@@ -227,21 +331,6 @@ export function Canvas3DRenderer({
         if (onCanvasReady) {
           onCanvasReady(canvas);
         }
-      }
-
-      // Helper function for rounded rectangles
-      function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
-        ctx.beginPath();
-        ctx.moveTo(x + radius, y);
-        ctx.lineTo(x + width - radius, y);
-        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-        ctx.lineTo(x + width, y + height - radius);
-        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-        ctx.lineTo(x + radius, y + height);
-        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-        ctx.lineTo(x, y + radius);
-        ctx.quadraticCurveTo(x, y, x + radius, y);
-        ctx.closePath();
       }
     };
 

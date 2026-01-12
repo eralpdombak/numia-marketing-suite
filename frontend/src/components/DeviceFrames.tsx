@@ -36,17 +36,17 @@ export function DeviceFrame({ deviceType, children, className, style, imageRadiu
         }}
       >
         <div
-          className="rounded-[12px] bg-[#2a2a2e] overflow-hidden"
+          className="rounded-[11px] bg-[#2a2a2e] overflow-hidden"
           style={{
             boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5), 0 10px 20px rgba(0, 0, 0, 0.4)',
           }}
         >
           {/* Title bar */}
           <div className="h-[32px] flex items-center justify-center px-3 relative">
-            <div className="absolute left-3 flex gap-[6px]">
-              <div className="w-[10px] h-[10px] rounded-full bg-[#ff5f57]" />
-              <div className="w-[10px] h-[10px] rounded-full bg-[#febc2e]" />
-              <div className="w-[10px] h-[10px] rounded-full bg-[#28c840]" />
+            <div className="absolute left-4 flex gap-[6px]">
+              <div className="w-[12px] h-[12px] rounded-full bg-[#ff5f57]" />
+              <div className="w-[12px] h-[12px] rounded-full bg-[#febc2e]" />
+              <div className="w-[12px] h-[12px] rounded-full bg-[#28c840]" />
             </div>
             <div className="h-[18px] w-[180px] rounded-md bg-[#1c1c1e] flex items-center justify-center">
               <span className="text-[9px] text-muted-foreground/50 text-center">numia.xyz</span>
@@ -54,7 +54,7 @@ export function DeviceFrame({ deviceType, children, className, style, imageRadiu
           </div>
 
           {/* Browser content */}
-          <div className="w-full aspect-[16/10] bg-[#1c1c1e] overflow-hidden">
+          <div className="w-full aspect-[16/10] bg-[#1c1c1e] overflow-hidden rounded-b-[11px]">
             {children}
           </div>
         </div>

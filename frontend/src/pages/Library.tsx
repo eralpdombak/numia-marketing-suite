@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Header } from "@/components/Header";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { localApi } from "@/lib/localApi";
 import {
@@ -491,7 +491,8 @@ export default function Library() {
 
   const handleDownload = (item: LocalLibraryItem) => {
     const link = document.createElement('a');
-    const filename = item.title ? `${item.title.replace(/[^a-zA-Z0-9-_]/g, '-')}.png` : `mockup-${item.id}.png`;
+    // Library items are JPEG, so use .jpg extension
+    const filename = item.title ? `${item.title.replace(/[^a-zA-Z0-9-_]/g, '-')}.jpg` : `mockup-${item.id}.jpg`;
     link.download = filename;
     link.href = item.src;
     link.click();
@@ -572,190 +573,83 @@ export default function Library() {
     <div className="min-h-screen bg-zinc-950">
       <Header />
       <main className="pt-14">
-        <div className="container mx-auto px-6 py-8">
-          {/* Header */}
-          <div className="flex items-center gap-3 mb-6">
-            <ArchiveIcon className="w-5 h-5 text-zinc-500" />
-            <h1 className="font-mono text-lg uppercase tracking-wider text-zinc-300">Library</h1>
-            <div className="flex-1 h-px bg-zinc-800" />
-            <button
-              onClick={loadLibraryItems}
-              className="px-3 py-1.5 bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 transition-colors font-mono text-[10px] uppercase tracking-wider"
-            >
-              ↻ Refresh
-            </button>
-            <span className="font-mono text-[10px] text-zinc-700 uppercase tracking-widest">
-              {currentItems.length} of {totalItems} items
-            </span>
-          </div>
-
-          {/* Search, Filter, Sort Bar */}
-          <div className="flex flex-wrap items-center gap-3 mb-6">
-            {/* Search */}
-            <div className="relative flex-1 min-w-[200px] max-w-md">
-              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={activeTab === "text" ? "Search content..." : "Search mockups..."}
-                className="w-full bg-zinc-900 border border-zinc-800 text-zinc-300 placeholder:text-zinc-600 font-mono text-xs pl-10 pr-4 py-2.5 focus:outline-none focus:border-zinc-600 transition-colors"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-400"
-                >
-                  <CloseIcon className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-
-            {/* Platform Filter (text tab only) */}
-            {activeTab === "text" && availablePlatforms.length > 0 && (
-              <div className="flex gap-1 bg-zinc-900 border border-zinc-800 p-1">
-                <button
-                  onClick={() => setPlatformFilter(null)}
-                  className={cn(
-                    "px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider transition-colors",
-                    !platformFilter ? "bg-zinc-700 text-zinc-200" : "text-zinc-500 hover:text-zinc-300"
-                  )}
-                >
-                  All
-                </button>
-                {availablePlatforms.map(platform => {
-                  const PlatformIcon = platformIcons[platform] || FileIcon;
-                  return (
+        <div className="container mx-auto px-6 py-12 max-w-7xl">
+          {/* Header - Top Bar */}
+          <div className="mb-8">
+            {/* Search Bar */}
+            {(textItems.length > 0 || imageItems.length > 0) && (
+              <div className="mb-6">
+                <div className="relative w-96">
+                  <SearchIcon className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-700" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search..."
+                    className="w-full bg-transparent border-b border-zinc-800 text-zinc-300 placeholder:text-zinc-700 font-mono text-sm pl-6 pr-8 py-2 focus:outline-none focus:border-zinc-600 transition-colors"
+                  />
+                  {searchQuery && (
                     <button
-                      key={platform}
-                      onClick={() => setPlatformFilter(platform === platformFilter ? null : platform)}
-                      className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider transition-colors",
-                        platformFilter === platform ? "bg-zinc-700 text-zinc-200" : "text-zinc-500 hover:text-zinc-300"
-                      )}
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-0 top-1/2 -translate-y-1/2 text-zinc-700 hover:text-zinc-500 transition-colors"
                     >
-                      <PlatformIcon className="w-3 h-3" />
-                      {getPlatformLabel(platform)}
+                      <CloseIcon className="w-3.5 h-3.5" />
                     </button>
-                  );
-                })}
+                  )}
+                </div>
               </div>
             )}
 
-            {/* Sort */}
-            <button
-              onClick={() => setSortOrder(sortOrder === "newest" ? "oldest" : "newest")}
-              className="flex items-center gap-2 px-3 py-2 bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 transition-colors"
-            >
-              <SortIcon className="w-4 h-4" />
-              <span className="font-mono text-[10px] uppercase tracking-wider">
-                {sortOrder === "newest" ? "Newest" : "Oldest"}
-              </span>
-            </button>
+            {/* Tabs and Stats */}
+            <div className="flex items-center justify-between border-b border-zinc-900 pb-4">
+              <div className="flex gap-8">
+                <button
+                  onClick={() => {
+                    setActiveTab("text");
+                    setSelectedIds(new Set());
+                    setSearchQuery("");
+                    setPlatformFilter(null);
+                  }}
+                  className={cn(
+                    "font-mono text-xs uppercase tracking-wider transition-all duration-100",
+                    activeTab === "text"
+                      ? "text-zinc-200"
+                      : "text-zinc-600 hover:text-zinc-400"
+                  )}
+                >
+                  Posts {textItems.length > 0 && `(${textItems.length})`}
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveTab("image");
+                    setSelectedIds(new Set());
+                    setSearchQuery("");
+                    loadLibraryItems();
+                  }}
+                  className={cn(
+                    "font-mono text-xs uppercase tracking-wider transition-all duration-100",
+                    activeTab === "image"
+                      ? "text-zinc-200"
+                      : "text-zinc-600 hover:text-zinc-400"
+                  )}
+                >
+                  Images {imageItems.length > 0 && `(${imageItems.length})`}
+                </button>
+              </div>
 
-            {/* Selection Mode Toggle */}
-            <button
-              onClick={() => {
-                setIsSelectionMode(!isSelectionMode);
-                setSelectedIds(new Set());
-              }}
-              className={cn(
-                "flex items-center gap-2 px-3 py-2 border transition-colors",
-                isSelectionMode 
-                  ? "bg-zinc-200 text-zinc-900 border-zinc-200" 
-                  : "bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700"
-              )}
-            >
-              <CheckboxIcon className="w-4 h-4" checked={isSelectionMode} />
-              <span className="font-mono text-[10px] uppercase tracking-wider">Select</span>
-            </button>
-          </div>
-
-          {/* Bulk Actions Bar */}
-          {isSelectionMode && selectedIds.size > 0 && (
-            <div className="flex items-center gap-3 mb-6 p-3 bg-zinc-900 border border-zinc-800 animate-fade-in">
-              <div className="w-1.5 h-1.5 bg-zinc-500" />
-              <span className="font-mono text-[10px] text-zinc-400 uppercase tracking-wider">
-                {selectedIds.size} selected
-              </span>
-              <div className="flex-1 h-px bg-zinc-800" />
-              <button
-                onClick={() => setSelectedIds(new Set())}
-                className="px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500 hover:text-zinc-300 transition-colors"
-              >
-                Clear
-              </button>
-              <button
-                onClick={() => {
-                  const items = activeTab === "text" ? filteredTextItems : filteredImageItems;
-                  setSelectedIds(new Set(items.map((i: DbLibraryItem | LocalLibraryItem) => i.id)));
-                }}
-                className="px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500 hover:text-zinc-300 transition-colors"
-              >
-                Select All
-              </button>
-              <button
-                onClick={handleBulkDelete}
-                className="flex items-center gap-2 px-3 py-1.5 bg-red-500 text-white hover:bg-red-600 transition-colors font-mono text-[10px] uppercase tracking-wider"
-              >
-                <TrashIcon className="w-3.5 h-3.5" />
-                Delete Selected
-              </button>
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-[10px] text-zinc-600 uppercase tracking-wider">
+                  {currentItems.length} items
+                </span>
+                <div className="h-3 w-px bg-zinc-800" />
+                <button
+                  onClick={loadLibraryItems}
+                  className="font-mono text-[10px] text-zinc-600 hover:text-zinc-400 uppercase tracking-wider transition-colors"
+                >
+                  ↻ Refresh
+                </button>
+              </div>
             </div>
-          )}
-
-          {/* Industrial Tabs */}
-          <div className="flex gap-px bg-zinc-800 p-px mb-8 max-w-md">
-            <button
-              onClick={() => {
-                setActiveTab("text");
-                setSelectedIds(new Set());
-                setSearchQuery("");
-                setPlatformFilter(null);
-              }}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-3 px-4 font-mono text-xs uppercase tracking-wider transition-all duration-150 border-l-2",
-                activeTab === "text"
-                  ? "bg-zinc-300 text-zinc-900 border-zinc-400"
-                  : "bg-zinc-900 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 border-transparent"
-              )}
-            >
-              <FileIcon className="w-4 h-4" />
-              Written Content
-              {textItems.length > 0 && (
-                <span className={cn(
-                  "ml-1 px-2 py-0.5 text-[10px]",
-                  activeTab === "text" ? "bg-zinc-900/20" : "bg-zinc-800"
-                )}>
-                  {textItems.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab("image");
-                setSelectedIds(new Set());
-                setSearchQuery("");
-                loadLibraryItems(); // Refresh when switching to images tab
-              }}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-3 px-4 font-mono text-xs uppercase tracking-wider transition-all duration-150 border-l-2",
-                activeTab === "image"
-                  ? "bg-zinc-300 text-zinc-900 border-zinc-400"
-                  : "bg-zinc-900 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 border-transparent"
-              )}
-            >
-              <ImageIcon className="w-4 h-4" />
-              Images
-              {imageItems.length > 0 && (
-                <span className={cn(
-                  "ml-1 px-2 py-0.5 text-[10px]",
-                  activeTab === "image" ? "bg-zinc-900/20" : "bg-zinc-800"
-                )}>
-                  {imageItems.length}
-                </span>
-              )}
-            </button>
           </div>
 
           {loading ? (
@@ -788,93 +682,58 @@ export default function Library() {
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {filteredTextItems.map((item, index) => {
                   const PlatformIcon = item.platform ? platformIcons[item.platform] : FileIcon;
                   const isSelected = selectedIds.has(item.id);
                   return (
                     <div
                       key={item.id}
-                      onClick={() => isSelectionMode && toggleSelection(item.id)}
-                      className={cn(
-                        "bg-zinc-900/50 rounded-lg border transition-all duration-200 cursor-pointer group",
-                        isSelected
-                          ? "border-zinc-500 shadow-lg shadow-zinc-500/10"
-                          : "border-zinc-800/50 hover:border-zinc-700/50 hover:bg-zinc-900/70",
-                        isSelectionMode && "cursor-pointer"
-                      )}
+                      className="group transition-all duration-100"
                       style={{ animationDelay: `${index * 30}ms` }}
                     >
-                      <div className="p-6">
-                        <div className="flex items-center gap-3 mb-4">
-                          {isSelectionMode && (
-                            <CheckboxIcon
-                              className={cn(
-                                "w-4 h-4 transition-colors flex-shrink-0",
-                                isSelected ? "text-zinc-300" : "text-zinc-600"
-                              )}
-                              checked={isSelected}
-                            />
-                          )}
-                          <PlatformIcon className="w-4 h-4 text-zinc-500 flex-shrink-0" />
-                          <span className="text-xs text-zinc-500">
+                      <div className="p-8 border border-zinc-900 hover:border-zinc-800 transition-all duration-100 cursor-pointer" onClick={() => handleViewFull(item)}>
+                        <div className="flex items-center gap-2 mb-4">
+                          <PlatformIcon className="w-4 h-4 text-zinc-600" />
+                          <span className="text-xs text-zinc-600 uppercase tracking-wider font-mono">
                             {getPlatformLabel(item.platform)}
-                          </span>
-                          <span className="text-xs text-zinc-700 ml-auto">
-                            {new Date(item.created_at).toLocaleDateString()}
                           </span>
                         </div>
 
-                        {item.title && (
-                          <h3 className="text-base text-zinc-200 mb-3 font-medium">{item.title}</h3>
-                        )}
-
-                        <p className="text-sm text-zinc-400 line-clamp-4 mb-5 leading-relaxed">
+                        <p className="text-base text-zinc-300 line-clamp-5 mb-6 leading-relaxed group-hover:text-zinc-200 transition-colors">
                           {cleanLinkedInContent(item.content, item.platform)}
                         </p>
 
-                        {!isSelectionMode && (
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewFull(item);
-                              }}
-                              className="flex-1 px-4 py-2 text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-800/50 hover:bg-zinc-800 rounded transition-colors"
-                            >
-                              View Full
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCopy(cleanLinkedInContent(item.content, item.platform), item.id);
-                              }}
-                              className="p-2 bg-zinc-800/50 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 rounded transition-colors"
-                              title="Copy"
-                            >
-                              {copiedId === item.id ? (
-                                <CheckIcon className="w-4 h-4" />
-                              ) : (
-                                <CopyIcon className="w-4 h-4" />
-                              )}
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteText(item.id);
-                              }}
-                              disabled={deleting === item.id}
-                              className="p-2 bg-zinc-800/50 text-zinc-600 hover:text-red-400 hover:bg-red-950/30 rounded transition-colors disabled:opacity-50"
-                              title="Delete"
-                            >
-                              {deleting === item.id ? (
-                                <LoaderIcon className="w-4 h-4" />
-                              ) : (
-                                <TrashIcon className="w-4 h-4" />
-                              )}
-                            </button>
-                          </div>
-                        )}
+                        <div className="flex items-center gap-4">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewFull(item);
+                            }}
+                            className="text-xs text-zinc-500 hover:text-zinc-300 font-mono uppercase tracking-wider transition-colors"
+                          >
+                            View
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopy(cleanLinkedInContent(item.content, item.platform), item.id);
+                            }}
+                            className="text-xs text-zinc-500 hover:text-zinc-300 font-mono uppercase tracking-wider transition-colors"
+                          >
+                            {copiedId === item.id ? "Copied" : "Copy"}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteText(item.id);
+                            }}
+                            disabled={deleting === item.id}
+                            className="text-xs text-zinc-600 hover:text-red-400 font-mono uppercase tracking-wider transition-colors disabled:opacity-50"
+                          >
+                            {deleting === item.id ? "..." : "Delete"}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -890,168 +749,81 @@ export default function Library() {
               <p className="font-mono text-[11px] text-zinc-700 mt-2">
                 Use "Save to Library" in the Shots editor
               </p>
-              <div className="mt-6 p-4 bg-zinc-900 border border-zinc-800 max-w-md">
-                <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-wider mb-2">Debug Info</p>
-                <p className="font-mono text-[10px] text-zinc-600">
-                  Total images in storage: {imageItems.length}
-                </p>
-                <p className="font-mono text-[10px] text-zinc-600">
-                  Storage key: {LIBRARY_STORAGE_KEY}
-                </p>
-                <button
-                  onClick={() => {
-                    const raw = localStorage.getItem(LIBRARY_STORAGE_KEY);
-                    alert(raw ? `Found ${JSON.parse(raw).length} images in localStorage` : 'No data in localStorage');
-                  }}
-                  className="mt-3 px-3 py-1.5 bg-zinc-800 text-zinc-400 hover:text-zinc-200 font-mono text-[10px] uppercase tracking-wider"
-                >
-                  Check Storage
-                </button>
-              </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredImageItems.map((item, index) => {
-                const isSelected = selectedIds.has(item.id);
-                return (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {filteredImageItems.map((item, index) => (
+                <div
+                  key={item.id}
+                  className="group transition-all duration-100"
+                  style={{ animationDelay: `${index * 30}ms` }}
+                >
                   <div
-                    key={item.id}
-                    onClick={() => isSelectionMode && toggleSelection(item.id)}
-                    className={cn(
-                      "group bg-zinc-900 border transition-all duration-150 overflow-hidden",
-                      isSelected 
-                        ? "border-zinc-400 ring-1 ring-zinc-400" 
-                        : "border-zinc-800 hover:border-zinc-700",
-                      isSelectionMode && "cursor-pointer"
-                    )}
-                    style={{ animationDelay: `${index * 30}ms` }}
+                    className="relative aspect-video overflow-hidden bg-zinc-900 border border-zinc-900 hover:border-zinc-800 cursor-pointer transition-all duration-100"
+                    onClick={() => setSelectedImage(item)}
                   >
-                    {/* Top bar */}
-                    <div className={cn(
-                      "h-1 transition-colors",
-                      isSelected 
-                        ? "bg-zinc-400" 
-                        : "bg-gradient-to-r from-zinc-700 via-zinc-600 to-zinc-700"
-                    )} />
-                    
-                    <div className="relative">
-                      {isSelectionMode && (
-                        <div className="absolute top-3 left-3 z-10">
-                          <CheckboxIcon 
-                            className={cn(
-                              "w-5 h-5 transition-colors drop-shadow-lg",
-                              isSelected ? "text-zinc-200" : "text-zinc-400"
-                            )} 
-                            checked={isSelected} 
-                          />
-                        </div>
-                      )}
-                      <img
-                        src={item.src}
-                        alt="Saved mockup"
-                        className={cn(
-                          "w-full aspect-video object-cover transition-transform duration-200",
-                          isSelected && "scale-[0.98]"
-                        )}
-                      />
-                      {!isSelectionMode && (
-                        <div className="absolute inset-0 bg-zinc-950/0 group-hover:bg-zinc-950/60 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedImage(item);
-                            }}
-                            className="p-2.5 bg-zinc-200 text-zinc-900 hover:bg-zinc-100 transition-colors"
-                          >
-                            <ExpandIcon className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDownload(item);
-                            }}
-                            className="p-2.5 bg-zinc-200 text-zinc-900 hover:bg-zinc-100 transition-colors"
-                          >
-                            <DownloadIcon className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteImage(item.id);
-                            }}
-                            className="p-2.5 bg-red-500 text-white hover:bg-red-600 transition-colors"
-                          >
-                            <TrashIcon className="w-4 h-4" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="p-3 border-t border-zinc-800">
-                      {item.title && (
-                        <p className="font-mono text-xs text-zinc-300 truncate mb-1">{item.title}</p>
-                      )}
-                      <div className="flex items-center">
-                        <div className="w-1.5 h-1.5 bg-zinc-700 mr-2" />
-                        <p className="font-mono text-[10px] text-zinc-600 uppercase tracking-wider">
-                          {new Date(item.createdAt).toLocaleDateString()} • {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      </div>
-                    </div>
+                    <img
+                      src={item.src}
+                      alt="Saved mockup"
+                      className="w-full h-full object-cover transition-all duration-100 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-zinc-950/0 group-hover:bg-zinc-950/40 transition-all duration-100" />
                   </div>
-                );
-              })}
+                  <div className="flex items-center gap-3 mt-3 px-1">
+                    <button
+                      onClick={() => setSelectedImage(item)}
+                      className="text-xs text-zinc-600 hover:text-zinc-400 font-mono uppercase tracking-wider transition-colors"
+                    >
+                      View
+                    </button>
+                    <button
+                      onClick={() => handleDownload(item)}
+                      className="text-xs text-zinc-600 hover:text-zinc-400 font-mono uppercase tracking-wider transition-colors"
+                    >
+                      Download
+                    </button>
+                    <button
+                      onClick={() => handleDeleteImage(item.id)}
+                      className="text-xs text-zinc-700 hover:text-red-400 font-mono uppercase tracking-wider transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
-          {/* Keyboard shortcuts hint */}
-          {isSelectionMode && (
-            <div className="mt-8 flex items-center justify-center gap-6 text-zinc-700">
-              <span className="font-mono text-[10px] uppercase tracking-wider">
-                <kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 mr-1">Esc</kbd> Exit
-              </span>
-              <span className="font-mono text-[10px] uppercase tracking-wider">
-                <kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 mr-1">⌘A</kbd> Select All
-              </span>
-              <span className="font-mono text-[10px] uppercase tracking-wider">
-                <kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 mr-1">Del</kbd> Delete
-              </span>
-            </div>
-          )}
         </div>
       </main>
 
-      {/* Image Preview Dialog */}
+      {/* Image Preview Dialog - Simplified */}
       <Dialog open={!!selectedImage} onOpenChange={(open) => !open && setSelectedImage(null)}>
-        <DialogContent className="max-w-5xl w-full bg-zinc-950 border-zinc-800 p-0 overflow-hidden">
+        <DialogContent className="max-w-6xl w-full bg-zinc-950 border-0 p-0 overflow-hidden">
           <DialogTitle className="sr-only">Image Preview</DialogTitle>
           {selectedImage && (
             <div className="relative">
-              <div className="h-1 bg-gradient-to-r from-zinc-700 via-zinc-500 to-zinc-700" />
               <img
                 src={selectedImage.src}
                 alt="Mockup preview"
                 className="w-full h-auto"
               />
-              <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-zinc-950 to-transparent flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 bg-zinc-600" />
-                  <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-wider">
-                    {new Date(selectedImage.createdAt).toLocaleDateString()} • {new Date(selectedImage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                </div>
-                <div className="flex gap-2">
+              <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-zinc-950 via-zinc-950/80 to-transparent flex items-center justify-between">
+                <div className="flex gap-4">
                   <button
                     onClick={() => handleDownload(selectedImage)}
-                    className="p-2 bg-zinc-200 text-zinc-900 hover:bg-zinc-100 transition-colors"
+                    className="font-mono text-xs uppercase tracking-wider text-zinc-400 hover:text-zinc-200 transition-colors"
                   >
-                    <DownloadIcon className="w-4 h-4" />
+                    Download
                   </button>
                   <button
-                    onClick={() => handleDeleteImage(selectedImage.id)}
-                    className="p-2 bg-red-500 text-white hover:bg-red-600 transition-colors"
+                    onClick={() => {
+                      handleDeleteImage(selectedImage.id);
+                      setSelectedImage(null);
+                    }}
+                    className="font-mono text-xs uppercase tracking-wider text-zinc-600 hover:text-red-400 transition-colors"
                   >
-                    <TrashIcon className="w-4 h-4" />
+                    Delete
                   </button>
                 </div>
               </div>
@@ -1060,67 +832,48 @@ export default function Library() {
         </DialogContent>
       </Dialog>
 
-      {/* Text Preview Dialog */}
+      {/* Text Preview Dialog - Simplified */}
       <Dialog open={!!selectedText} onOpenChange={(open) => !open && setSelectedText(null)}>
-        <DialogContent className="max-w-3xl w-full bg-zinc-950 border-zinc-800/50 rounded-lg p-0 overflow-hidden">
+        <DialogContent className="max-w-2xl w-full bg-zinc-950 border-0 p-12">
           <DialogTitle className="sr-only">Content Preview</DialogTitle>
           {selectedText && (
-            <div className="p-8">
-              <div className="flex items-center gap-3 mb-6 pb-4 border-b border-zinc-800/50">
+            <div>
+              <div className="flex items-center gap-2 mb-8">
                 {selectedText.platform && (
                   <>
                     {(() => {
                       const PlatformIcon = platformIcons[selectedText.platform] || FileIcon;
-                      return <PlatformIcon className="w-4 h-4 text-zinc-500" />;
+                      return <PlatformIcon className="w-4 h-4 text-zinc-600" />;
                     })()}
-                    <span className="text-sm text-zinc-500">
+                    <span className="text-xs text-zinc-600 uppercase tracking-wider font-mono">
                       {getPlatformLabel(selectedText.platform)}
                     </span>
                   </>
                 )}
-                <span className="text-xs text-zinc-700 ml-auto">
-                  {new Date(selectedText.created_at).toLocaleDateString()}
-                </span>
               </div>
 
-              {selectedText.title && (
-                <h2 className="text-xl text-zinc-200 mb-6 font-medium">{selectedText.title}</h2>
-              )}
-
-              <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="max-h-[60vh] overflow-y-auto mb-8">
                 <p className="text-base text-zinc-300 whitespace-pre-wrap leading-relaxed">
                   {cleanLinkedInContent(selectedText.content, selectedText.platform)}
                 </p>
               </div>
 
-              <div className="flex items-center gap-3 mt-8 pt-6 border-t border-zinc-800/50">
+              <div className="flex items-center gap-6 pt-6 border-t border-zinc-900">
                 <button
                   onClick={() => handleCopy(cleanLinkedInContent(selectedText.content, selectedText.platform), selectedText.id)}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-zinc-800 text-zinc-200 hover:bg-zinc-700 rounded transition-colors text-sm"
+                  className="font-mono text-xs uppercase tracking-wider text-zinc-400 hover:text-zinc-200 transition-colors"
                 >
-                  {copiedId === selectedText.id ? (
-                    <>
-                      <CheckIcon className="w-4 h-4" />
-                      Copied
-                    </>
-                  ) : (
-                    <>
-                      <CopyIcon className="w-4 h-4" />
-                      Copy
-                    </>
-                  )}
+                  {copiedId === selectedText.id ? "Copied" : "Copy"}
                 </button>
                 <button
-                  onClick={() => handleDeleteText(selectedText.id)}
+                  onClick={() => {
+                    handleDeleteText(selectedText.id);
+                    setSelectedText(null);
+                  }}
                   disabled={deleting === selectedText.id}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded transition-colors text-sm disabled:opacity-50"
+                  className="font-mono text-xs uppercase tracking-wider text-zinc-600 hover:text-red-400 transition-colors disabled:opacity-50"
                 >
-                  {deleting === selectedText.id ? (
-                    <LoaderIcon className="w-4 h-4" />
-                  ) : (
-                    <TrashIcon className="w-4 h-4" />
-                  )}
-                  Delete
+                  {deleting === selectedText.id ? "..." : "Delete"}
                 </button>
               </div>
             </div>

@@ -8,8 +8,6 @@ export interface MockupSettings {
   imageRadius: number;
   imageScale: number;
   browserScale: number;
-  imageRotateY: number;
-  imageRotateX: number;
   shadow: boolean;
   deviceColor: 'black' | 'silver';
   brandingPosition: BrandingPosition;
