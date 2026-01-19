@@ -1055,6 +1055,112 @@ app.delete('/api/library/image/:filename', async (req, res) => {
 });
 
 /**
+ * Get MIME type from filename extension
+ */
+function getMimeType(fileName) {
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  const mimeTypes = {
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'gif': 'image/gif',
+    'webp': 'image/webp',
+    'svg': 'image/svg+xml',
+  };
+  return mimeTypes[ext] || 'application/octet-stream';
+}
+
+/**
+ * Upload image to Typefully using their media upload API
+ * @param {string} socialSetId - The social set ID
+ * @param {Buffer} imageBuffer - The image data as a buffer
+ * @param {string} fileName - The filename for the upload
+ * @param {string} apiKey - Typefully API key
+ * @returns {Promise<string>} - The media_id to use in drafts
+ */
+async function uploadImageToTypefully(socialSetId, imageBuffer, fileName, apiKey) {
+  const mimeType = getMimeType(fileName);
+  console.log('[Typefully] Requesting upload URL for:', fileName, 'MIME:', mimeType);
+
+  // 1. Request upload URL from Typefully (include content_type)
+  const uploadReq = await fetch(
+    `https://api.typefully.com/v2/social-sets/${socialSetId}/media/upload`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        file_name: fileName,
+        content_type: mimeType,
+      }),
+    }
+  );
+
+  if (!uploadReq.ok) {
+    const errorText = await uploadReq.text();
+    throw new Error(`Failed to get upload URL: ${uploadReq.status} - ${errorText}`);
+  }
+
+  const uploadData = await uploadReq.json();
+  console.log('[Typefully] Full API response:', JSON.stringify(uploadData, null, 2));
+
+  const { media_id, upload_url, upload_headers } = uploadData;
+  console.log('[Typefully] Got media_id:', media_id);
+
+  // 2. Upload binary to presigned URL
+  // IMPORTANT: Do NOT send any headers - the presigned URL has metadata in query params
+  // Adding Content-Type or x-amz-meta-* headers breaks the S3 signature
+  console.log('[Typefully] Uploading image to presigned URL (no headers)...');
+
+  const uploadRes = await fetch(upload_url, {
+    method: 'PUT',
+    body: imageBuffer,
+  });
+
+  if (!uploadRes.ok) {
+    const errorBody = await uploadRes.text();
+    console.error('[Typefully] S3 upload error:', uploadRes.status, errorBody);
+    throw new Error(`Failed to upload to presigned URL: ${uploadRes.status}`);
+  }
+  console.log('[Typefully] Image uploaded successfully');
+
+  // 3. Poll for ready status (max 30s)
+  console.log('[Typefully] Polling for media processing status...');
+  for (let i = 0; i < 30; i++) {
+    const statusRes = await fetch(
+      `https://api.typefully.com/v2/social-sets/${socialSetId}/media/${media_id}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+        },
+      }
+    );
+
+    if (!statusRes.ok) {
+      throw new Error(`Failed to check media status: ${statusRes.status}`);
+    }
+
+    const data = await statusRes.json();
+    console.log(`[Typefully] Media status (attempt ${i + 1}):`, data.status);
+
+    if (data.status === 'ready') {
+      console.log('[Typefully] Media processing complete');
+      return media_id;
+    }
+    if (data.status === 'failed') {
+      throw new Error('Media processing failed on Typefully');
+    }
+
+    // Wait 1 second before next poll
+    await new Promise(r => setTimeout(r, 1000));
+  }
+
+  throw new Error('Media processing timeout (30s)');
+}
+
+/**
  * POST /api/typefully/draft
  * Create a draft in Typefully
  */
@@ -1070,44 +1176,9 @@ app.post('/api/typefully/draft', async (req, res) => {
       });
     }
 
-    // If mediaUrl is a localhost URL, upload to imgbb to get a public URL
-    if (mediaUrl && mediaUrl.startsWith('http://localhost')) {
-      try {
-        console.log('[Typefully] Localhost image detected, uploading to imgbb...');
-
-        // Read the image file from disk
-        const filename = mediaUrl.split('/').pop();
-        const imagePath = path.join(__dirname, 'public/library-images', filename);
-        const imageBuffer = await fs.readFile(imagePath);
-        const base64Image = imageBuffer.toString('base64');
-
-        // Upload to imgbb (free anonymous upload)
-        const FormData = require('form-data');
-        const form = new FormData();
-        form.append('image', base64Image);
-
-        const uploadResponse = await fetch('https://api.imgbb.com/1/upload?key=d841c8274df032afb3d901f0c21e02e0', {
-          method: 'POST',
-          body: form,
-        });
-
-        if (uploadResponse.ok) {
-          const uploadData = await uploadResponse.json();
-          mediaUrl = uploadData.data.url;
-          console.log('[Typefully] Image uploaded to imgbb:', mediaUrl);
-        } else {
-          console.error('[Typefully] imgbb upload failed, proceeding without image');
-          mediaUrl = null;
-        }
-      } catch (uploadError) {
-        console.error('[Typefully] Failed to upload image:', uploadError);
-        mediaUrl = null;
-      }
-    }
-
     // Determine which platform to use (default to Twitter if not specified)
     const platformKey = platform === 'linkedin' ? 'linkedin' : 'x';
-    console.log(`Creating ${platformKey} draft in Typefully`);
+    console.log(`[Typefully] Creating ${platformKey} draft`);
 
     // First, get the social sets to find the default one
     const setsResponse = await fetch('https://api.typefully.com/v2/social-sets', {
@@ -1126,7 +1197,7 @@ app.post('/api/typefully/draft', async (req, res) => {
     }
 
     const sets = await setsResponse.json();
-    console.log('Typefully social sets response:', JSON.stringify(sets, null, 2));
+    console.log('[Typefully] Social sets response:', JSON.stringify(sets, null, 2));
 
     // Handle different response structures
     let socialSetId;
@@ -1143,6 +1214,26 @@ app.post('/api/typefully/draft', async (req, res) => {
       });
     }
 
+    // Upload image to Typefully if provided
+    let mediaId = null;
+    if (mediaUrl && mediaUrl.startsWith('http://localhost')) {
+      try {
+        console.log('[Typefully] Localhost image detected, uploading to Typefully...');
+
+        // Read the image file from disk
+        const filename = mediaUrl.split('/').pop();
+        const imagePath = path.join(__dirname, 'public/library-images', filename);
+        const imageBuffer = await fs.readFile(imagePath);
+
+        // Upload to Typefully using proper media API
+        mediaId = await uploadImageToTypefully(socialSetId, imageBuffer, filename, typefullyApiKey);
+        console.log('[Typefully] Image uploaded with media_id:', mediaId);
+      } catch (uploadError) {
+        console.error('[Typefully] Failed to upload image:', uploadError.message);
+        // Continue without image rather than failing the whole request
+      }
+    }
+
     // Build the draft payload for Typefully API v2
     const draftPayload = {
       platforms: {
@@ -1151,16 +1242,12 @@ app.post('/api/typefully/draft', async (req, res) => {
           posts: [
             {
               text: content || '',
+              ...(mediaId && { media_ids: [mediaId] }),
             }
           ]
         }
       }
     };
-
-    // Add media if provided (only for valid public URLs)
-    if (mediaUrl && !mediaUrl.startsWith('data:')) {
-      draftPayload.platforms[platformKey].posts[0].media_urls = [mediaUrl];
-    }
 
     console.log('Creating draft with payload:', JSON.stringify(draftPayload, null, 2));
 
