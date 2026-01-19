@@ -10,7 +10,8 @@ import { NotificationDisplay } from "@/components/NotificationDisplay";
 import Home from "./pages/Home";
 import Shots from "./pages/Index";
 import Library from "./pages/Library";
-import Simulator from "./pages/Simulator";
+import Notes from "./pages/Notes";
+import Intelligence from "./pages/Intelligence";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -31,7 +32,8 @@ function AnimatedRoutes() {
         <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
         <Route path="/shots" element={<ProtectedRoute><Shots /></ProtectedRoute>} />
         <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-        <Route path="/simulator" element={<ProtectedRoute><Simulator /></ProtectedRoute>} />
+        <Route path="/intelligence" element={<ProtectedRoute><Intelligence /></ProtectedRoute>} />
+        <Route path="/notes" element={<ProtectedRoute><Notes /></ProtectedRoute>} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>

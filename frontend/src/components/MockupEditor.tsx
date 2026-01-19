@@ -192,7 +192,7 @@ export function MockupEditor() {
       setIsSavingToLibrary(true);
       try {
         console.log('[MockupEditor] Starting save to library...');
-        // Use JPEG for library - smaller file size for localStorage
+        // Use JPEG for library - smaller file size
         const dataUrl = await captureCanvas('jpeg');
 
         if (!dataUrl) {
@@ -200,60 +200,50 @@ export function MockupEditor() {
           throw new Error("Capture failed - no data returned");
         }
 
-        console.log('[MockupEditor] Got data URL, length:', dataUrl.length);
+        console.log('[MockupEditor] Got data URL, uploading to server...');
 
+        // Upload to server to get public URL
+        const API_URL = import.meta.env.VITE_LOCAL_MODE === 'true'
+          ? 'http://localhost:3001'
+          : '';
+
+        const uploadResponse = await fetch(`${API_URL}/api/library/upload-image`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            imageData: dataUrl,
+            title: title || undefined,
+          }),
+        });
+
+        if (!uploadResponse.ok) {
+          const error = await uploadResponse.json();
+          throw new Error(error.error || 'Upload failed');
+        }
+
+        const { url, filename } = await uploadResponse.json();
+        console.log('[MockupEditor] Image uploaded:', filename);
+
+        // Save image metadata with public URL to localStorage
         let savedImages = JSON.parse(localStorage.getItem(LIBRARY_STORAGE_KEY) || '[]');
         const newImage = {
           id: crypto.randomUUID(),
-          src: dataUrl,
+          src: url,  // Public URL instead of base64
           createdAt: Date.now(),
           title: title || undefined,
+          filename,  // Store filename for deletion
         };
         savedImages.push(newImage);
 
-        console.log('[MockupEditor] Saving image to localStorage:', newImage.id, 'Total images:', savedImages.length);
-
-        // Try to save, if quota exceeded, remove oldest images
-        let quotaHandled = false;
-        try {
-          localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(savedImages));
-          console.log('[MockupEditor] Image saved successfully');
-        } catch (quotaError) {
-          console.warn('[MockupEditor] Quota exceeded, removing oldest images...');
-
-          // Remove oldest images until we can save
-          while (savedImages.length > 1) {
-            savedImages.shift(); // Remove oldest
-            try {
-              localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(savedImages));
-              console.log('[MockupEditor] Saved after removing old images. Remaining:', savedImages.length);
-              quotaHandled = true;
-              break;
-            } catch (e) {
-              // Still too big, keep removing
-              continue;
-            }
-          }
-
-          // If still can't save even with just 1 image, throw error
-          if (savedImages.length === 1) {
-            try {
-              localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(savedImages));
-            } catch (e) {
-              throw new Error("Image too large for storage");
-            }
-          }
-        }
+        localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(savedImages));
+        console.log('[MockupEditor] Image saved successfully');
 
         // Dispatch custom event to notify other components
         window.dispatchEvent(new Event('localStorageUpdate'));
 
-        // Show single notification
-        if (quotaHandled) {
-          toast.success("Saved (removed oldest to make space)");
-        } else {
-          toast.success("Saved to library");
-        }
+        toast.success("Saved to library");
       } catch (error) {
         toast.error(`Failed to save: ${error instanceof Error ? error.message : 'Unknown error'}`);
         console.error('[MockupEditor] Save error:', error);

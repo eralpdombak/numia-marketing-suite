@@ -4,14 +4,16 @@ import { cn } from "@/lib/utils";
 import {
   ApertureIcon,
   ArchiveIcon,
-  DisplayIcon,
+  NotesIcon,
+  BrainIcon,
   CloseIcon,
 } from "@/components/icons";
 
 export const navItems = [
+  { path: "/notes", label: "Notes", icon: NotesIcon, description: "Quick ideas" },
   { path: "/shots", label: "Shots", icon: ApertureIcon, description: "Device mockups" },
   { path: "/library", label: "Library", icon: ArchiveIcon, description: "Content assets" },
-  { path: "/simulator", label: "Simulator", icon: DisplayIcon, description: "Device preview" },
+  { path: "/intelligence", label: "Intelligence", icon: BrainIcon, description: "Knowledge base" },
 ];
 
 interface NavigationOverlayProps {
@@ -28,21 +30,33 @@ export function NavigationOverlay({ isOpen, onClose }: NavigationOverlayProps) {
 
   useEffect(() => {
     if (isOpen) {
-      const timer = setTimeout(() => setContentVisible(true), 50);
-      return () => clearTimeout(timer);
+      // Save current scroll position
+      const scrollY = window.scrollY;
+
+      // Lock body and force to top
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+
+      // Set content visible immediately to prevent layout shift being visible
+      setContentVisible(true);
     } else {
+      // Restore scroll position
+      const scrollY = document.body.style.top;
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+      window.scrollTo(0, parseInt(scrollY || '0') * -1);
+
       setContentVisible(false);
     }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
     return () => {
-      document.body.style.overflow = "";
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
     };
   }, [isOpen]);
 
@@ -64,7 +78,7 @@ export function NavigationOverlay({ isOpen, onClose }: NavigationOverlayProps) {
   };
   
   return (
-    <div 
+    <div
       className={cn(
         "fixed inset-0 z-[100]",
         isOpen ? "pointer-events-auto" : "pointer-events-none"
@@ -73,7 +87,7 @@ export function NavigationOverlay({ isOpen, onClose }: NavigationOverlayProps) {
       {/* Background - Frosted glass effect */}
       <div
         className={cn(
-          "absolute inset-0 bg-background/80 backdrop-blur-xl transition-opacity duration-400",
+          "absolute inset-0 bg-zinc-950/40 backdrop-blur-xl transition-opacity duration-400",
           contentVisible ? "opacity-100" : "opacity-0"
         )}
         onClick={onClose}
@@ -96,7 +110,7 @@ export function NavigationOverlay({ isOpen, onClose }: NavigationOverlayProps) {
       />
 
       {/* Content */}
-      <div className="relative h-full flex flex-col">
+      <div className="relative h-screen flex flex-col">
         {/* Header bar */}
         <div
           className={cn(
@@ -128,16 +142,16 @@ export function NavigationOverlay({ isOpen, onClose }: NavigationOverlayProps) {
         </div>
 
         {/* Main control grid */}
-        <div className="flex-1 container mx-auto px-6 py-12 flex items-center justify-center" onClick={onClose}>
+        <div className="flex-1 flex items-center justify-center px-6" onClick={onClose}>
           <div
             className={cn(
-              "w-full max-w-4xl transition-all duration-500",
+              "w-full max-w-5xl transition-all duration-500",
               contentVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"
             )}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Module grid */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               {navItems.map((item, index) => {
                 const isActive = location.pathname === item.path;
                 const isHovered = hoveredIndex === index;

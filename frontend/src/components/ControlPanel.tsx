@@ -118,10 +118,10 @@ function Divider() {
   );
 }
 
-export function ControlPanel({ 
-  settings, 
-  onSettingsChange, 
-  onExport, 
+export function ControlPanel({
+  settings,
+  onSettingsChange,
+  onExport,
   isExporting,
   presets,
   onSavePreset,
@@ -143,8 +143,11 @@ export function ControlPanel({
   };
 
   return (
-    <div className="space-y-5">
-      {/* Border Selection */}
+    <div className="h-full flex flex-col">
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="space-y-5">
+            {/* Border Selection */}
       <div className="space-y-3">
         <SectionLabel>Border</SectionLabel>
         <div className="flex gap-px bg-zinc-800 p-px">
@@ -399,6 +402,8 @@ export function ControlPanel({
         <span className="font-mono text-[8px] text-zinc-700 uppercase tracking-widest">v1.0</span>
         <div className="flex-1 h-px bg-zinc-800" />
         <div className="w-2 h-2 border border-zinc-800" />
+      </div>
+        </div>
       </div>
     </div>
   );
