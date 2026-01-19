@@ -193,6 +193,16 @@ function CloseIcon({ className }: { className?: string }) {
   );
 }
 
+function ExportIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className={className}>
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+
 const platformIcons: Record<string, React.FC<{ className?: string }>> = {
   linkedin: LinkedInIcon,
   twitter: TwitterIcon,
@@ -329,9 +339,20 @@ export default function Library() {
 
       if (IS_LOCAL_MODE) {
         // Load from local API server
-        const data = await localApi.getAll();
-        console.log('[Library] Loaded from local API:', data.length, 'items');
-        setTextItems(data.filter(item => item.type === "text") as DbLibraryItem[]);
+        const apiData = await localApi.getAll();
+        console.log('[Library] Loaded from local API:', apiData.length, 'items');
+
+        // Also load from localStorage (for items saved from Notes page)
+        const localStorageItems = JSON.parse(localStorage.getItem('library_items') || '[]');
+        console.log('[Library] Loaded from localStorage:', localStorageItems.length, 'items');
+
+        // Merge both sources
+        const allTextItems = [
+          ...localStorageItems.filter((item: DbLibraryItem) => item.type === "text"),
+          ...apiData.filter(item => item.type === "text")
+        ];
+
+        setTextItems(allTextItems as DbLibraryItem[]);
       } else {
         // Load from Supabase (cloud mode)
         console.log('[Library] Loading from Supabase...');
@@ -424,8 +445,17 @@ export default function Library() {
     try {
       console.log('[Library] Deleting text item:', id, 'Local mode:', IS_LOCAL_MODE);
       if (IS_LOCAL_MODE) {
-        await localApi.delete(id);
-        console.log('[Library] Deleted from backend successfully');
+        // Try deleting from local API first
+        try {
+          await localApi.delete(id);
+          console.log('[Library] Deleted from backend successfully');
+        } catch (apiError) {
+          // If API delete fails, item might be in localStorage only
+          console.log('[Library] API delete failed, trying localStorage');
+          const localItems = JSON.parse(localStorage.getItem('library_items') || '[]');
+          const updated = localItems.filter((item: DbLibraryItem) => item.id !== id);
+          localStorage.setItem('library_items', JSON.stringify(updated));
+        }
       } else {
         const { error } = await supabase.from("library_items").delete().eq("id", id);
         if (error) throw error;
@@ -443,13 +473,39 @@ export default function Library() {
     }
   };
 
-  const handleDeleteImage = (id: string) => {
-    const updated = imageItems.filter(item => item.id !== id);
-    setImageItems(updated);
-    localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(updated));
-    toast.success("Removed from library");
-    if (selectedImage?.id === id) {
-      setSelectedImage(null);
+  const handleDeleteImage = async (id: string) => {
+    try {
+      const item = imageItems.find(i => i.id === id);
+      if (!item) return;
+
+      // Delete from server if it has a filename (new URL-based images)
+      if ('filename' in item && item.filename) {
+        const API_URL = import.meta.env.VITE_LOCAL_MODE === 'true'
+          ? 'http://localhost:3001'
+          : '';
+
+        try {
+          await fetch(`${API_URL}/api/library/image/${item.filename}`, {
+            method: 'DELETE',
+          });
+          console.log('[Library] Deleted image file from server:', item.filename);
+        } catch (error) {
+          console.error('[Library] Failed to delete from server:', error);
+          // Continue anyway to remove from localStorage
+        }
+      }
+
+      // Remove from localStorage
+      const updated = imageItems.filter(item => item.id !== id);
+      setImageItems(updated);
+      localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(updated));
+      toast.success("Removed from library");
+      if (selectedImage?.id === id) {
+        setSelectedImage(null);
+      }
+    } catch (error) {
+      console.error('[Library] Delete error:', error);
+      toast.error('Failed to delete image');
     }
   };
 
@@ -463,8 +519,16 @@ export default function Library() {
       try {
         console.log('[Library] Bulk deleting:', count, 'items, Local mode:', IS_LOCAL_MODE);
         if (IS_LOCAL_MODE) {
-          await localApi.bulkDelete(idsArray);
-          console.log('[Library] Bulk deleted from backend successfully');
+          try {
+            await localApi.bulkDelete(idsArray);
+            console.log('[Library] Bulk deleted from backend successfully');
+          } catch (apiError) {
+            console.log('[Library] API bulk delete failed, trying localStorage');
+          }
+          // Also clean up localStorage
+          const localItems = JSON.parse(localStorage.getItem('library_items') || '[]');
+          const updated = localItems.filter((item: DbLibraryItem) => !selectedIds.has(item.id));
+          localStorage.setItem('library_items', JSON.stringify(updated));
         } else {
           const { error } = await supabase
             .from("library_items")
@@ -479,6 +543,27 @@ export default function Library() {
         toast.error(`Failed to delete items: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     } else {
+      // Bulk delete images
+      const imagesToDelete = imageItems.filter(item => selectedIds.has(item.id));
+      const API_URL = import.meta.env.VITE_LOCAL_MODE === 'true'
+        ? 'http://localhost:3001'
+        : '';
+
+      // Delete files from server for new URL-based images
+      for (const item of imagesToDelete) {
+        if ('filename' in item && item.filename) {
+          try {
+            await fetch(`${API_URL}/api/library/image/${item.filename}`, {
+              method: 'DELETE',
+            });
+            console.log('[Library] Deleted image file from server:', item.filename);
+          } catch (error) {
+            console.error('[Library] Failed to delete from server:', error);
+            // Continue with other deletions
+          }
+        }
+      }
+
       const updated = imageItems.filter(item => !selectedIds.has(item.id));
       setImageItems(updated);
       localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(updated));
@@ -504,8 +589,17 @@ export default function Library() {
       let fullItem: DbLibraryItem;
 
       if (IS_LOCAL_MODE) {
-        // Fetch full content from local API
-        fullItem = await localApi.getOne(item.id);
+        // Try fetching from local API first
+        try {
+          fullItem = await localApi.getOne(item.id);
+        } catch (apiError) {
+          // If API fails, item might be in localStorage only
+          console.log('[Library] API fetch failed, trying localStorage');
+          const localItems = JSON.parse(localStorage.getItem('library_items') || '[]');
+          const localItem = localItems.find((i: DbLibraryItem) => i.id === item.id);
+          if (!localItem) throw new Error('Item not found');
+          fullItem = localItem;
+        }
       } else {
         // Fetch full content from Supabase
         const { data, error } = await supabase
@@ -541,6 +635,52 @@ export default function Library() {
     setCopiedId(id);
     toast.success("Copied to clipboard");
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleExport = async (item: DbLibraryItem | LocalLibraryItem) => {
+    try {
+      const API_URL = import.meta.env.VITE_LOCAL_MODE === 'true'
+        ? 'http://localhost:3001'
+        : '';
+
+      let content = '';
+      let mediaUrl: string | undefined;
+      let platform: string | undefined;
+
+      // Check if it's a text item or image item
+      if ('content' in item) {
+        // Text item
+        content = cleanLinkedInContent(item.content, item.platform);
+        platform = item.platform || undefined;
+      } else {
+        // Image item - just send the image
+        mediaUrl = item.src;
+      }
+
+      const response = await fetch(`${API_URL}/api/typefully/draft`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content,
+          mediaUrl,
+          platform,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create draft');
+      }
+
+      const result = await response.json();
+      toast.success(result.message || "Draft created in Typefully!");
+      console.log("[Library] Draft created:", result);
+    } catch (error) {
+      console.error("[Library] Export error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to export to Typefully");
+    }
   };
 
   const toggleSelection = useCallback((id: string) => {
@@ -704,34 +844,45 @@ export default function Library() {
                           {cleanLinkedInContent(item.content, item.platform)}
                         </p>
 
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewFull(item);
+                              }}
+                              className="text-xs text-zinc-500 hover:text-zinc-300 font-mono uppercase tracking-wider transition-colors"
+                            >
+                              View
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCopy(cleanLinkedInContent(item.content, item.platform), item.id);
+                              }}
+                              className="text-xs text-zinc-500 hover:text-zinc-300 font-mono uppercase tracking-wider transition-colors"
+                            >
+                              {copiedId === item.id ? "Copied" : "Copy"}
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteText(item.id);
+                              }}
+                              disabled={deleting === item.id}
+                              className="text-xs text-zinc-600 hover:text-red-400 font-mono uppercase tracking-wider transition-colors disabled:opacity-50"
+                            >
+                              {deleting === item.id ? "..." : "Delete"}
+                            </button>
+                          </div>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleViewFull(item);
+                              handleExport(item);
                             }}
-                            className="text-xs text-zinc-500 hover:text-zinc-300 font-mono uppercase tracking-wider transition-colors"
+                            className="text-xs text-blue-400 hover:text-blue-500 font-mono uppercase tracking-wider transition-colors"
                           >
-                            View
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCopy(cleanLinkedInContent(item.content, item.platform), item.id);
-                            }}
-                            className="text-xs text-zinc-500 hover:text-zinc-300 font-mono uppercase tracking-wider transition-colors"
-                          >
-                            {copiedId === item.id ? "Copied" : "Copy"}
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteText(item.id);
-                            }}
-                            disabled={deleting === item.id}
-                            className="text-xs text-zinc-600 hover:text-red-400 font-mono uppercase tracking-wider transition-colors disabled:opacity-50"
-                          >
-                            {deleting === item.id ? "..." : "Delete"}
+                            Export
                           </button>
                         </div>
                       </div>
@@ -769,24 +920,32 @@ export default function Library() {
                     />
                     <div className="absolute inset-0 bg-zinc-950/0 group-hover:bg-zinc-950/40 transition-all duration-100" />
                   </div>
-                  <div className="flex items-center gap-3 mt-3 px-1">
+                  <div className="flex items-center justify-between mt-3 px-1">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setSelectedImage(item)}
+                        className="text-xs text-zinc-600 hover:text-zinc-400 font-mono uppercase tracking-wider transition-colors"
+                      >
+                        View
+                      </button>
+                      <button
+                        onClick={() => handleDownload(item)}
+                        className="text-xs text-zinc-600 hover:text-zinc-400 font-mono uppercase tracking-wider transition-colors"
+                      >
+                        Download
+                      </button>
+                      <button
+                        onClick={() => handleDeleteImage(item.id)}
+                        className="text-xs text-zinc-700 hover:text-red-400 font-mono uppercase tracking-wider transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
                     <button
-                      onClick={() => setSelectedImage(item)}
-                      className="text-xs text-zinc-600 hover:text-zinc-400 font-mono uppercase tracking-wider transition-colors"
+                      onClick={() => handleExport(item)}
+                      className="text-xs text-blue-400 hover:text-blue-500 font-mono uppercase tracking-wider transition-colors"
                     >
-                      View
-                    </button>
-                    <button
-                      onClick={() => handleDownload(item)}
-                      className="text-xs text-zinc-600 hover:text-zinc-400 font-mono uppercase tracking-wider transition-colors"
-                    >
-                      Download
-                    </button>
-                    <button
-                      onClick={() => handleDeleteImage(item.id)}
-                      className="text-xs text-zinc-700 hover:text-red-400 font-mono uppercase tracking-wider transition-colors"
-                    >
-                      Delete
+                      Export
                     </button>
                   </div>
                 </div>
@@ -826,6 +985,12 @@ export default function Library() {
                     Delete
                   </button>
                 </div>
+                <button
+                  onClick={() => handleExport(selectedImage)}
+                  className="font-mono text-xs uppercase tracking-wider text-blue-400 hover:text-blue-500 transition-colors"
+                >
+                  Export
+                </button>
               </div>
             </div>
           )}
@@ -858,22 +1023,30 @@ export default function Library() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-6 pt-6 border-t border-zinc-900">
+              <div className="flex items-center justify-between pt-6 border-t border-zinc-900">
+                <div className="flex items-center gap-6">
+                  <button
+                    onClick={() => handleCopy(cleanLinkedInContent(selectedText.content, selectedText.platform), selectedText.id)}
+                    className="font-mono text-xs uppercase tracking-wider text-zinc-400 hover:text-zinc-200 transition-colors"
+                  >
+                    {copiedId === selectedText.id ? "Copied" : "Copy"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleDeleteText(selectedText.id);
+                      setSelectedText(null);
+                    }}
+                    disabled={deleting === selectedText.id}
+                    className="font-mono text-xs uppercase tracking-wider text-zinc-600 hover:text-red-400 transition-colors disabled:opacity-50"
+                  >
+                    {deleting === selectedText.id ? "..." : "Delete"}
+                  </button>
+                </div>
                 <button
-                  onClick={() => handleCopy(cleanLinkedInContent(selectedText.content, selectedText.platform), selectedText.id)}
-                  className="font-mono text-xs uppercase tracking-wider text-zinc-400 hover:text-zinc-200 transition-colors"
+                  onClick={() => handleExport(selectedText)}
+                  className="font-mono text-xs uppercase tracking-wider text-blue-400 hover:text-blue-500 transition-colors"
                 >
-                  {copiedId === selectedText.id ? "Copied" : "Copy"}
-                </button>
-                <button
-                  onClick={() => {
-                    handleDeleteText(selectedText.id);
-                    setSelectedText(null);
-                  }}
-                  disabled={deleting === selectedText.id}
-                  className="font-mono text-xs uppercase tracking-wider text-zinc-600 hover:text-red-400 transition-colors disabled:opacity-50"
-                >
-                  {deleting === selectedText.id ? "..." : "Delete"}
+                  Export
                 </button>
               </div>
             </div>

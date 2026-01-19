@@ -110,6 +110,11 @@ export default {
           "50%": { opacity: "1", transform: "scale(1) rotate(180deg)" },
           "100%": { opacity: "0", transform: "scale(0) rotate(360deg)" },
         },
+        "scan": {
+          "0%": { top: "0%", opacity: "0" },
+          "50%": { opacity: "1" },
+          "100%": { top: "100%", opacity: "0" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -119,6 +124,7 @@ export default {
         "fade-left": "fade-left 0.4s ease-out",
         "scale-in": "scale-in 0.3s ease-out",
         "sparkle": "sparkle 0.8s ease-out forwards",
+        "scan": "scan 2s ease-in-out infinite",
       },
     },
   },

@@ -91,16 +91,16 @@ export function CompassIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={cn("w-5 h-5", className)}>
       {/* Outer circle */}
-      <circle cx="12" cy="12" r="11" strokeWidth="0.75" opacity="1" />
+      <circle cx="12" cy="12" r="11" strokeWidth="0.6" opacity="1" />
 
       {/* Inner circle */}
-      <circle cx="12" cy="12" r="7" strokeWidth="0.4" strokeOpacity="0.5" />
+      <circle cx="12" cy="12" r="7" strokeWidth="0.35" strokeOpacity="0.7" />
 
       {/* Cardinal direction lines - outside outer circle only, no overlap */}
-      <line x1="12" y1="0" x2="12" y2="1" strokeWidth="0.4" opacity="1" />
-      <line x1="12" y1="23" x2="12" y2="24" strokeWidth="0.4" opacity="1" />
-      <line x1="0" y1="12" x2="1" y2="12" strokeWidth="0.4" opacity="1" />
-      <line x1="23" y1="12" x2="24" y2="12" strokeWidth="0.4" opacity="1" />
+      <line x1="12" y1="0" x2="12" y2="1" strokeWidth="0.6" opacity="1" />
+      <line x1="12" y1="23" x2="12" y2="24" strokeWidth="0.6" opacity="1" />
+      <line x1="0" y1="12" x2="1" y2="12" strokeWidth="0.6" opacity="1" />
+      <line x1="23" y1="12" x2="24" y2="12" strokeWidth="0.6" opacity="1" />
 
       {/* NUMIA text */}
       <text
@@ -108,11 +108,11 @@ export function CompassIcon({ className }: IconProps) {
         y="12.5"
         textAnchor="middle"
         fontSize="2.5"
-        fontWeight="600"
+        fontWeight="700"
         fontFamily="system-ui, sans-serif"
         fill="currentColor"
         stroke="none"
-        letterSpacing="0.2"
+        letterSpacing="0.1"
       >
         NUMIA
       </text>
@@ -272,6 +272,34 @@ export function CheckboxIcon({ className, checked }: IconProps & { checked?: boo
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className={cn("w-5 h-5", className)}>
       <rect x="3" y="3" width="18" height="18" rx="2" fill={checked ? "currentColor" : "none"} />
       {checked && <path d="M9 12l2 2 4-4" stroke="hsl(var(--background))" strokeWidth="2" />}
+    </svg>
+  );
+}
+
+export function NotesIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className={cn("w-5 h-5", className)}>
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+      <path d="M14 2v6h6" />
+      <line x1="8" y1="13" x2="16" y2="13" />
+      <line x1="8" y1="17" x2="14" y2="17" />
+    </svg>
+  );
+}
+
+export function BrainIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className={cn("w-5 h-5", className)}>
+      <rect x="4" y="4" width="16" height="16" rx="1" />
+      <circle cx="12" cy="12" r="2" fill="currentColor" />
+      <line x1="12" y1="4" x2="12" y2="10" />
+      <line x1="12" y1="14" x2="12" y2="20" />
+      <line x1="4" y1="12" x2="10" y2="12" />
+      <line x1="14" y1="12" x2="20" y2="12" />
+      <circle cx="12" cy="4" r="1" fill="currentColor" />
+      <circle cx="12" cy="20" r="1" fill="currentColor" />
+      <circle cx="4" cy="12" r="1" fill="currentColor" />
+      <circle cx="20" cy="12" r="1" fill="currentColor" />
     </svg>
   );
 }

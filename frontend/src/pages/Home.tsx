@@ -153,15 +153,43 @@ export default function Home() {
   const showBackdrop = compassState !== 'idle' && !nav.isOpen;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Subtle grid background */}
+      <div
+        className="absolute inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage: `
+            linear-gradient(hsl(var(--foreground)) 1px, transparent 1px),
+            linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)
+          `,
+          backgroundSize: '80px 80px',
+        }}
+      />
+
+      {/* Radial gradient overlay */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: 'radial-gradient(circle at 50% 50%, transparent 0%, hsl(var(--background)) 100%)',
+        }}
+      />
+
+      {/* Noise texture */}
+      <div
+        className="absolute inset-0 opacity-[0.015]"
+        style={{
+          backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 400 400\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")',
+        }}
+      />
+
       <NavigationOverlay isOpen={nav.isOpen} onClose={nav.close} />
-      
+
       {/* Backdrop during animation */}
-      <div 
+      <div
         className={cn(
           "fixed inset-0 z-[150] pointer-events-none transition-all duration-500",
-          showBackdrop 
-            ? "bg-background/60 backdrop-blur-sm" 
+          showBackdrop
+            ? "bg-background/60 backdrop-blur-sm"
             : "bg-transparent backdrop-blur-0 opacity-0"
         )}
       />
@@ -195,7 +223,7 @@ export default function Home() {
       )}
       
       {/* Main content - just the compass */}
-      <main className="min-h-screen flex items-center justify-center">
+      <main className="min-h-screen flex items-center justify-center relative z-10">
         <button
           ref={compassButtonRef}
           onClick={handleCompassClick}
@@ -209,11 +237,11 @@ export default function Home() {
           )}
         >
           {/* Compass icon */}
-          <div 
+          <div
             className="absolute inset-0 flex items-center justify-center transition-transform duration-700 group-hover:rotate-45"
             style={{ transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)' }}
           >
-            <CompassIcon className="w-full h-full text-muted-foreground/70 group-hover:text-foreground transition-colors duration-300" />
+            <CompassIcon className="w-full h-full text-muted-foreground group-hover:text-white transition-colors duration-300" />
           </div>
         </button>
       </main>
