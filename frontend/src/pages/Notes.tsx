@@ -4,6 +4,7 @@ import { toast } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import { LinkedInIcon, TwitterIcon, FileIcon, MailIcon, BrainIcon } from "@/components/icons";
 import { supabase } from "@/integrations/supabase/client";
+import { Progress } from "@/components/ui/progress";
 
 type CommandType = "linkedin" | "twitter" | "blog" | "email" | "newsletter" | "thread";
 
@@ -122,6 +123,135 @@ function ArrowRightIcon({ className }: { className?: string }) {
   );
 }
 
+// Clean content by removing AI meta-commentary and markdown formatting
+function cleanGeneratedContent(rawContent: string): string {
+  let cleaned = rawContent.trim();
+
+  // AGGRESSIVE: Remove everything before the actual content starts
+  // Strip any leading meta-commentary sentences one by one until we hit real content
+  const metaPrefixes = [
+    // Acknowledgments and meta-discussion (KILL FIRST)
+    /^Got it[^.!?]*[.!?]\s*/i,
+    /^Okay[^.!?]*[.!?]\s*/i,
+    /^Alright[^.!?]*[.!?]\s*/i,
+    /^Perfect[^.!?]*[.!?]\s*/i,
+    /^Great[^.!?]*[.!?]\s*/i,
+    /^Understood[^.!?]*[.!?]\s*/i,
+    /^Now I have[^.!?]*[.!?]\s*/i,
+    /^Now I understand[^.!?]*[.!?]\s*/i,
+    // Questions asking for clarification (KILL THESE FIRST)
+    /^I need more context[^.!?]*[.!?]\s*/i,
+    /^I need additional[^.!?]*[.!?]\s*/i,
+    /^Could you provide[^.!?]*[.!?]\s*/i,
+    /^Could you[^.!?]*[.!?]\s*/i,
+    /^What's the[^.!?]*[.!?]\s*/i,
+    /^What is the[^.!?]*[.!?]\s*/i,
+    /^Give me[^.!?]*[.!?]\s*/i,
+    /^Can you[^.!?]*[.!?]\s*/i,
+    /^Would you[^.!?]*[.!?]\s*/i,
+    // Regular meta-commentary
+    /^I need permission[^.!?]*[.!?]\s*/i,
+    /^I need to[^.!?]*[.!?]\s*/i,
+    /^I want to[^.!?]*[.!?]\s*/i,
+    /^I should[^.!?]*[.!?]\s*/i,
+    /^I can deliver[^.!?]*[.!?]\s*/i,
+    /^I can provide[^.!?]*[.!?]\s*/i,
+    /^I can create[^.!?]*[.!?]\s*/i,
+    /^I can't[^.!?]*[.!?]\s*/i,
+    /^I cannot[^.!?]*[.!?]\s*/i,
+    /^However, I can[^.!?]*[.!?]\s*/i,
+    /^Let me craft[^.!?]*[.!?]\s*/i,
+    /^Let me create[^.!?]*[.!?]\s*/i,
+    /^Let me write[^.!?]*[.!?]\s*/i,
+    /^Let me deliver[^.!?]*[.!?]\s*/i,
+    /^Let me make[^.!?]*[.!?]\s*/i,
+    /^Let me[^.!?]*[.!?]\s*/i,
+    /^I'm going to[^.!?]*[.!?]\s*/i,
+    /^I'll make[^.!?]*[.!?]\s*/i,
+    /^I'll[^.!?]*[.!?]\s*/i,
+    /^I've[^.!?]*[.!?]\s*/i,
+    /^Sure,?[^.!?]*[.!?]\s*/i,
+    /^Certainly,?[^.!?]*[.!?]\s*/i,
+    /^Of course,?[^.!?]*[.!?]\s*/i,
+    /^Here's[^:]*:\s*/i,
+    /^Here are[^:]*:\s*/i,
+    /^Here is[^:]*:\s*/i,
+    /^This is[^:]*:\s*/i,
+    /^Below is[^:]*:\s*/i,
+    /^Option \d+:?\s*/i,
+    /^Post \d+:?\s*/i,
+    /^Thread \d+:?\s*/i,
+    /^Tweet \d+:?\s*/i,
+    /^Version \d+:?\s*/i,
+    /^Draft:?\s*/i,
+    /^🧵.*$/im,
+  ];
+
+  // NUCLEAR OPTION: Strip ENTIRE paragraphs of meta-commentary
+  // This catches multi-sentence AI blabber before the actual content
+  const metaParagraphs = [
+    /^(?:Got it|Okay|Alright|Perfect|Great|Understood)[!.]?[^]*?(?=\n\n[A-Z]|$)/i,
+    /^Now I (?:have|understand)[^]*?(?=\n\n[A-Z]|$)/i,
+    /^(?:I need more context|Could you provide|What's the|Give me|Can you|Would you)[^]*?(?=\n\n|$)/i,
+  ];
+
+  metaParagraphs.forEach(pattern => {
+    cleaned = cleaned.replace(pattern, '').trim();
+  });
+
+  // If there are numbered lists of questions, nuke them
+  cleaned = cleaned.replace(/^\d+\.\s+What[^]*?(?=\n\n[A-Z]|$)/i, '').trim();
+
+  // Keep stripping until nothing matches (max 20 iterations for safety)
+  let iterations = 0;
+  let previousContent = '';
+  while (cleaned !== previousContent && iterations < 20) {
+    previousContent = cleaned;
+    for (const pattern of metaPrefixes) {
+      cleaned = cleaned.replace(pattern, '').trim();
+    }
+    iterations++;
+  }
+
+  // Remove separator lines
+  cleaned = cleaned.replace(/^---+\s*$/gm, '');
+  cleaned = cleaned.replace(/^===+\s*$/gm, '');
+  cleaned = cleaned.replace(/^___+\s*$/gm, '');
+
+  // Remove ALL markdown formatting
+  cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, '$1'); // **bold**
+  cleaned = cleaned.replace(/\*([^*]+)\*/g, '$1');     // *italic*
+  cleaned = cleaned.replace(/__([^_]+)__/g, '$1');     // __bold__
+  cleaned = cleaned.replace(/_([^_]+)_/g, '$1');       // _italic_
+  cleaned = cleaned.replace(/^#{1,6}\s+/gm, '');       // # headers
+
+  // Remove code blocks if any
+  cleaned = cleaned.replace(/```[\s\S]*?```/g, '');
+  cleaned = cleaned.replace(/`([^`]+)`/g, '$1');
+
+  // NUCLEAR: Remove trailing meta-analysis and commentary
+  // These patterns indicate the AI is explaining what it just wrote
+  const trailingMetaPatterns = [
+    /\n\n(?:The Hook:|FOMO Elements:|Product Integration:|Humanized Writing:|Call to Action:|Analysis:|Breakdown:|Structure:|Key Elements:|Why this works:|The post is|Word count:|Notes?:|This follows?|This creates?)[^]*$/i,
+    /\n\nThis (?:post|thread|content|approach)[^]*$/i,
+    /\n\nI (?:used|included|incorporated|added|made|created|wrote|structured)[^]*$/i,
+    /\n\n\*\*[^*]+\*\*\s*$/,  // Trailing bold text (often used for analysis headers)
+    /\n\n---+\s*$/,  // Trailing separators
+  ];
+
+  trailingMetaPatterns.forEach(pattern => {
+    cleaned = cleaned.replace(pattern, '');
+  });
+
+  // Clean up extra blank lines (max 2 consecutive newlines)
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+
+  // Final trim
+  cleaned = cleaned.trim();
+
+  return cleaned;
+}
+
 export default function Notes() {
   const [selectedCommand, setSelectedCommand] = useState<CommandType>("linkedin");
   const [input, setInput] = useState("");
@@ -145,9 +275,11 @@ export default function Notes() {
     let simulatedProgress = 0;
     const progressInterval = setInterval(() => {
       simulatedProgress += 1;
-      // Slow down as we approach 90% to avoid going too far ahead
+      // Logarithmic slowdown as we approach 90% to avoid going too far ahead
+      // Starts fast, then slows down smoothly
+      const increment = Math.max(0.5, (90 - simulatedProgress) / 20);
       if (simulatedProgress < 90) {
-        setProgress(prev => Math.min(90, prev + 1));
+        setProgress(prev => Math.floor(Math.min(90, prev + increment)));
       }
     }, 300); // Update every 300ms
 
@@ -222,7 +354,7 @@ export default function Notes() {
       }
 
       const decoder = new TextDecoder();
-      let accumulatedContent = "";
+      let accumulatedRawContent = "";
       let hasReceivedContent = false;
 
       while (true) {
@@ -248,13 +380,17 @@ export default function Notes() {
                   hasReceivedContent = true;
                 }
 
-                accumulatedContent += content;
-                setOutput(accumulatedContent);
+                accumulatedRawContent += content;
 
-                // Calculate real progress based on word count
-                const wordCount = accumulatedContent.trim().split(/\s+/).filter(w => w.length > 0).length;
-                const calculatedProgress = Math.min(95, Math.floor((wordCount / targetWords) * 100));
-                setProgress(calculatedProgress);
+                // Clean the content before displaying it
+                const cleanedContent = cleanGeneratedContent(accumulatedRawContent);
+                setOutput(cleanedContent);
+
+                // Calculate real progress based on word count of cleaned content
+                const wordCount = cleanedContent.trim().split(/\s+/).filter(w => w.length > 0).length;
+                const calculatedProgress = Math.floor(Math.min(95, (wordCount / targetWords) * 100));
+                // Only update if progress increases (never go backwards)
+                setProgress(prev => Math.max(prev, calculatedProgress));
               }
             } catch (e) {
               // Skip invalid JSON
@@ -264,7 +400,16 @@ export default function Notes() {
       }
 
       clearInterval(progressInterval);
+
+      // Final cleaning pass to ensure everything is clean
+      const finalCleanedContent = cleanGeneratedContent(accumulatedRawContent);
+      setOutput(finalCleanedContent);
+
+      // Ensure progress reaches 100% before hiding loader
       setProgress(100);
+
+      // Small delay to ensure user sees 100% before loading state disappears
+      await new Promise(resolve => setTimeout(resolve, 300));
     } catch (error) {
       clearInterval(progressInterval);
       toast.error("Failed to generate content");
@@ -400,10 +545,10 @@ export default function Notes() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950">
+    <div className="h-screen bg-zinc-950 overflow-hidden">
       <Header />
-      <main className="pt-14">
-        <div className="container mx-auto px-6 py-8 max-w-7xl">
+      <main className="h-full pt-14 overflow-hidden">
+        <div className="h-full container mx-auto px-6 py-8 max-w-7xl overflow-hidden">
 
           {/* Command Selector */}
           <div className="mb-8">
@@ -424,7 +569,6 @@ export default function Notes() {
                     key={command.id}
                     onClick={() => {
                       setSelectedCommand(command.id);
-                      setInput("");
                       setOutput("");
                     }}
                     className={cn(
@@ -494,7 +638,7 @@ export default function Notes() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder={currentCommand.placeholder}
-                  className="w-full h-[500px] bg-transparent text-zinc-300 placeholder:text-zinc-700 resize-none focus:outline-none font-mono text-sm leading-relaxed"
+                  className="w-full h-[350px] bg-transparent text-zinc-300 placeholder:text-zinc-700 resize-none focus:outline-none font-mono text-sm leading-relaxed"
                   disabled={isGenerating}
                 />
               </div>
@@ -532,38 +676,28 @@ export default function Notes() {
 
               <div className="p-6">
                 {isGenerating ? (
-                  <div className="flex flex-col items-center justify-center h-[500px]">
-                    <span className="font-mono text-xs text-zinc-600 uppercase tracking-wider mb-6">
-                      Generating {currentCommand.label}...
-                    </span>
-
-                    {/* Terminal-style block progress */}
-                    <div className="flex items-center gap-0.5 font-mono text-xs">
-                      <span className="text-zinc-700">[</span>
-                      {Array.from({ length: 20 }).map((_, i) => {
-                        const blockProgress = (progress / 100) * 20;
-                        const isActive = i < blockProgress;
-                        return (
-                          <span
-                            key={i}
-                            className={isActive ? "text-zinc-500" : "text-zinc-800"}
-                          >
-                            {isActive ? "█" : "░"}
-                          </span>
-                        );
-                      })}
-                      <span className="text-zinc-700">]</span>
-                      <span className="text-zinc-600 ml-3 tabular-nums">{progress}%</span>
+                  <div className="flex flex-col items-center justify-center h-[350px] gap-6">
+                    <div className="w-full max-w-xs space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-xs text-zinc-400 uppercase tracking-wider">
+                          Generating {currentCommand.label}
+                        </span>
+                        <span className="font-mono text-xs text-zinc-500 tabular-nums">{progress}%</span>
+                      </div>
+                      <Progress
+                        value={progress}
+                        className="h-1 bg-zinc-900"
+                      />
                     </div>
                   </div>
                 ) : output ? (
-                  <div className="h-[500px] overflow-y-auto">
+                  <div className="h-[350px] overflow-y-auto">
                     <pre className="text-zinc-300 font-mono text-sm leading-relaxed whitespace-pre-wrap">
                       {output}
                     </pre>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-[500px]">
+                  <div className="flex flex-col items-center justify-center h-[350px]">
                     <div className="w-12 h-12 border border-zinc-800 flex items-center justify-center mb-4">
                       <SparklesIcon className="w-6 h-6 text-zinc-700" />
                     </div>

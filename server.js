@@ -267,7 +267,7 @@ app.post('/api/generate-content', async (req, res) => {
       },
       'email': {
         command: '/email',
-        guidelines: null
+        guidelines: 'intelligence/post-guidelines/email-guidelines.md'
       },
       'newsletter': {
         command: '/newsletter',
@@ -317,91 +317,151 @@ app.post('/api/generate-content', async (req, res) => {
     let buffer = '';
     let hasStartedSending = false;
 
-    // Patterns that indicate meta-commentary (case-insensitive)
-    const metaCommentaryPatterns = [
-      /^I see the permission issue\./i,
-      /^I need your permission/i,
-      /^In the meantime/i,
-      /^Let me show you/i,
-      /^Here's (a|an|the|your)/i,
-      /^I've created/i,
-      /^I'll create/i,
-      /^Based on your/i,
-      /^Would you like me to/i,
-      /^Should I/i,
-      /^POST \d+\/\d+:/i,
-      /^THREAD \d+\/\d+:/i,
-      /^Tweet \d+:/i,
-      /^LinkedIn Post:/i,
-      /^Twitter Thread:/i,
-      /^Blog Post:/i,
-      /^---+\s*$/,
-      /^\*\*LinkedIn Post:/i,
-      /^\*\*Twitter Thread:/i,
-      /^\*\*Blog Post:/i,
-      /^✅/,  // Checklist items
-      /^❌/,  // Checklist items
-      /^\*\*Hook \(/i,  // **Hook (77 chars):**
-      /^\*\*Ultra-specific/i,
-      /^\*\*Tons of white/i,
-      /^\*\*No AI-speak/i,
-      /^\*\*Validation/i,
-      /^\*\*Engagement/i,
-      /^\*\*Tangible/i,
-      /^\*\*Emotional/i,
-      /^\*\*No hashtags/i,
-      /^\*\*Respectful/i,
-      /^The post is ready to be saved/i,
-      /^once you approve/i,
-      /^file write permission/i,
+    // AGGRESSIVE: Block ALL meta-commentary before content starts
+    const preContentMetaPatterns = [
+      // Acknowledgments and meta-discussion (BLOCK FIRST)
+      /^Done\./i,
+      /^Got it/i,
+      /^Okay/i,
+      /^Alright/i,
+      /^Perfect/i,
+      /^Great[!.]/i,
+      /^Understood/i,
+      /^Now I/i,  // Catches "Now I'll", "Now I have", "Now I understand", etc.
+      // Questions asking for clarification (BLOCK THESE IMMEDIATELY)
+      /^I need more context/i,
+      /^I need additional/i,
+      /^Could you provide/i,
+      /^Could you/i,
+      /^What's the/i,
+      /^What is the/i,
+      /^Give me/i,
+      /^Can you/i,
+      /^Would you/i,
+      // Regular meta-commentary
+      /^I need permission/i,
+      /^I need to/i,
+      /^I want to/i,
+      /^I should/i,
+      /^I can deliver/i,
+      /^I can provide/i,
+      /^I can create/i,
+      /^I can't/i,
+      /^I cannot/i,
+      /^However, I can/i,
+      /^Let me craft/i,
+      /^Let me create/i,
+      /^Let me write/i,
+      /^Let me deliver/i,
+      /^Let me make/i,
+      /^Let me/i,
+      /^I'm going to/i,
+      /^I'll make/i,
+      /^I'll/i,
+      /^I've/i,
+      /^Sure,?/i,
+      /^Certainly,?/i,
+      /^Of course,?/i,
+      /^Here's/i,
+      /^Here are/i,
+      /^Here is/i,
+      /^This is/i,
+      /^Below is/i,
+      /^Option \d+/i,
+      /^Post \d+/i,
+      /^Thread \d+/i,
+      /^Tweet \d+/i,
+      /^Version \d+/i,
+      /^Draft/i,
+      /^---+$/,
+      /^===+$/,
+      /^___+$/,
+      /^🧵/,
+      /^\d+\./,  // Numbered lists (often questions)
+      /^-\s+/,   // Bullet points (often meta-analysis lists)
+      /needs to:/i,  // "The post needs to:"
+      /should:/i,    // "should include:"
+      /must:/i,      // "must have:"
+      /following the/i,  // "following the guidelines"
+      /^The post/i,  // "The post needs to..."
+      /^The thread/i,  // "The thread should..."
+      /^The blog/i,    // "The blog must..."
     ];
 
-    const shouldSkipLine = (line) => {
+    // NUCLEAR: Patterns that indicate meta-analysis AFTER content
+    // If we see these, STOP streaming immediately (content is done, rest is commentary)
+    const postContentMetaPatterns = [
+      /^Key elements I/i,
+      /^Key elements:/i,
+      /^The Hook:/i,
+      /^Hook:/i,
+      /^FOMO Elements:/i,
+      /^Product Integration:/i,
+      /^Call to Action:/i,
+      /^Why this works:/i,
+      /^This post/i,
+      /^This thread/i,
+      /^This approach/i,
+      /^I used/i,
+      /^I included/i,
+      /^I incorporated/i,
+      /^I baked in/i,
+      /^Word count:/i,
+      /^Character count:/i,
+    ];
+
+    const shouldSkipPreContentLine = (line) => {
       const trimmed = line.trim();
       if (!trimmed) return false;
-      return metaCommentaryPatterns.some(pattern => pattern.test(trimmed));
+      // Only check if we haven't started sending content yet
+      return preContentMetaPatterns.some(pattern => pattern.test(trimmed));
     };
 
-    let hasEncounteredPostCommentary = false;
+    const isPostContentMeta = (line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return false;
+      return postContentMetaPatterns.some(pattern => pattern.test(trimmed));
+    };
 
     claudeProcess.stdout.on('data', (data) => {
       const text = data.toString();
       buffer += text;
 
-      // Process line by line to filter out meta-commentary
+      // Process line by line to skip only initial meta-commentary
       const lines = buffer.split('\n');
 
       // Keep the last incomplete line in buffer
       buffer = lines.pop() || '';
 
       for (const line of lines) {
-        // If we've already hit post-content commentary, stop sending everything
-        if (hasEncounteredPostCommentary) {
-          continue;
+        // STOP IMMEDIATELY if we detect post-content meta-analysis
+        if (hasStartedSending && isPostContentMeta(line)) {
+          console.log('🛑 Detected post-content meta-analysis, stopping stream:', line.substring(0, 50));
+          // Stop the Claude process
+          claudeProcess.kill();
+          // Send final marker and end response
+          res.write('data: [DONE]\n\n');
+          res.end();
+          return;
         }
 
-        // Check if this line is meta-commentary
-        const isMetaCommentary = shouldSkipLine(line);
+        // Only skip pre-content meta-commentary
+        if (!hasStartedSending) {
+          const isPreContentMeta = shouldSkipPreContentLine(line);
 
-        if (isMetaCommentary) {
-          // If we've already started sending content, this is POST-content meta-commentary
-          // Stop sending from here on out
-          if (hasStartedSending) {
-            console.log('Hit post-content commentary, stopping output:', line.substring(0, 50));
-            hasEncounteredPostCommentary = true;
+          if (isPreContentMeta) {
+            console.log('Skipped pre-content meta:', line.substring(0, 50));
             continue;
           }
-          // Otherwise it's pre-content meta-commentary, just skip it
-          console.log('Filtered out pre-content meta-commentary:', line.substring(0, 50));
-          continue;
+
+          // Start sending once we hit actual content
+          if (line.trim()) {
+            console.log('Starting content stream at:', line.substring(0, 50));
+            hasStartedSending = true;
+          }
         }
 
-        // Only start sending after we've skipped initial meta-commentary
-        if (!hasStartedSending && line.trim()) {
-          console.log('Starting content output at:', line.substring(0, 50));
-          hasStartedSending = true;
-        }
-
+        // Once we've started, send EVERYTHING (frontend will clean it)
         if (hasStartedSending) {
           const lineWithNewline = line + '\n';
           // Send each character as streaming chunk in OpenAI format
@@ -424,8 +484,8 @@ app.post('/api/generate-content', async (req, res) => {
     });
 
     claudeProcess.on('close', (code) => {
-      // Send any remaining buffered content
-      if (buffer.trim() && hasStartedSending && !shouldSkipLine(buffer)) {
+      // Send any remaining buffered content (frontend will clean it)
+      if (buffer.trim() && hasStartedSending) {
         for (const char of buffer) {
           const chunk = {
             choices: [{
@@ -1055,118 +1115,18 @@ app.delete('/api/library/image/:filename', async (req, res) => {
 });
 
 /**
- * Get MIME type from filename extension
- */
-function getMimeType(fileName) {
-  const ext = fileName.split('.').pop()?.toLowerCase();
-  const mimeTypes = {
-    'jpg': 'image/jpeg',
-    'jpeg': 'image/jpeg',
-    'png': 'image/png',
-    'gif': 'image/gif',
-    'webp': 'image/webp',
-    'svg': 'image/svg+xml',
-  };
-  return mimeTypes[ext] || 'application/octet-stream';
-}
-
-/**
- * Upload image to Typefully using their media upload API
- * @param {string} socialSetId - The social set ID
- * @param {Buffer} imageBuffer - The image data as a buffer
- * @param {string} fileName - The filename for the upload
- * @param {string} apiKey - Typefully API key
- * @returns {Promise<string>} - The media_id to use in drafts
- */
-async function uploadImageToTypefully(socialSetId, imageBuffer, fileName, apiKey) {
-  const mimeType = getMimeType(fileName);
-  console.log('[Typefully] Requesting upload URL for:', fileName, 'MIME:', mimeType);
-
-  // 1. Request upload URL from Typefully (include content_type)
-  const uploadReq = await fetch(
-    `https://api.typefully.com/v2/social-sets/${socialSetId}/media/upload`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        file_name: fileName,
-        content_type: mimeType,
-      }),
-    }
-  );
-
-  if (!uploadReq.ok) {
-    const errorText = await uploadReq.text();
-    throw new Error(`Failed to get upload URL: ${uploadReq.status} - ${errorText}`);
-  }
-
-  const uploadData = await uploadReq.json();
-  console.log('[Typefully] Full API response:', JSON.stringify(uploadData, null, 2));
-
-  const { media_id, upload_url, upload_headers } = uploadData;
-  console.log('[Typefully] Got media_id:', media_id);
-
-  // 2. Upload binary to presigned URL
-  // IMPORTANT: Do NOT send any headers - the presigned URL has metadata in query params
-  // Adding Content-Type or x-amz-meta-* headers breaks the S3 signature
-  console.log('[Typefully] Uploading image to presigned URL (no headers)...');
-
-  const uploadRes = await fetch(upload_url, {
-    method: 'PUT',
-    body: imageBuffer,
-  });
-
-  if (!uploadRes.ok) {
-    const errorBody = await uploadRes.text();
-    console.error('[Typefully] S3 upload error:', uploadRes.status, errorBody);
-    throw new Error(`Failed to upload to presigned URL: ${uploadRes.status}`);
-  }
-  console.log('[Typefully] Image uploaded successfully');
-
-  // 3. Poll for ready status (max 30s)
-  console.log('[Typefully] Polling for media processing status...');
-  for (let i = 0; i < 30; i++) {
-    const statusRes = await fetch(
-      `https://api.typefully.com/v2/social-sets/${socialSetId}/media/${media_id}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-        },
-      }
-    );
-
-    if (!statusRes.ok) {
-      throw new Error(`Failed to check media status: ${statusRes.status}`);
-    }
-
-    const data = await statusRes.json();
-    console.log(`[Typefully] Media status (attempt ${i + 1}):`, data.status);
-
-    if (data.status === 'ready') {
-      console.log('[Typefully] Media processing complete');
-      return media_id;
-    }
-    if (data.status === 'failed') {
-      throw new Error('Media processing failed on Typefully');
-    }
-
-    // Wait 1 second before next poll
-    await new Promise(r => setTimeout(r, 1000));
-  }
-
-  throw new Error('Media processing timeout (30s)');
-}
-
-/**
  * POST /api/typefully/draft
  * Create a draft in Typefully
  */
 app.post('/api/typefully/draft', async (req, res) => {
   try {
     let { content, mediaUrl, platform } = req.body;
+
+    // DEBUG: Log what we received
+    console.log('[Typefully] Request received:');
+    console.log('  content:', content ? `"${content.substring(0, 50)}..."` : content);
+    console.log('  mediaUrl:', mediaUrl);
+    console.log('  platform:', platform);
 
     // Check for Typefully API key
     const typefullyApiKey = process.env.TYPEFULLY_API_KEY;
@@ -1176,9 +1136,184 @@ app.post('/api/typefully/draft', async (req, res) => {
       });
     }
 
+    // Variable to store media_id from Typefully
+    let typefullyMediaId = null;
+
+    // If mediaUrl is a localhost URL, upload to Typefully to get media_id
+    if (mediaUrl && mediaUrl.startsWith('http://localhost')) {
+      try {
+        console.log('[Typefully] Localhost image detected, uploading to Typefully...');
+
+        // Read the image file from disk
+        const filename = mediaUrl.split('/').pop();
+
+        // Security: validate filename
+        if (!filename || filename.includes('..') || filename.includes('/')) {
+          throw new Error('Invalid filename in mediaUrl');
+        }
+
+        const imagePath = path.join(__dirname, 'public/library-images', filename);
+
+        // Verify file exists before reading
+        try {
+          await fs.access(imagePath);
+        } catch (accessError) {
+          throw new Error(`Image file not found: ${filename}`);
+        }
+
+        const imageBuffer = await fs.readFile(imagePath);
+
+        // Validate file size (max 10MB for social media)
+        const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+        if (imageBuffer.length > maxSizeBytes) {
+          throw new Error(`Image too large: ${(imageBuffer.length / 1024 / 1024).toFixed(1)}MB. Maximum is 10MB.`);
+        }
+
+        console.log('[Typefully] Image:', filename, 'Size:', (imageBuffer.length / 1024).toFixed(1), 'KB');
+
+        // First, get social set ID
+        const setsResponse = await fetch('https://api.typefully.com/v2/social-sets', {
+          headers: { 'Authorization': `Bearer ${typefullyApiKey}` },
+        });
+
+        if (!setsResponse.ok) throw new Error('Failed to get social sets');
+
+        const sets = await setsResponse.json();
+        const socialSetId = sets.results?.[0]?.id || sets.data?.[0]?.id || sets[0]?.id;
+        if (!socialSetId) throw new Error('No social set found');
+
+        console.log('[Typefully] Using social set:', socialSetId);
+
+        // Step 1: Request upload URL from Typefully
+        const uploadInitResp = await fetch(`https://api.typefully.com/v2/social-sets/${socialSetId}/media/upload`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${typefullyApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ file_name: filename }),
+        });
+
+        if (!uploadInitResp.ok) {
+          const err = await uploadInitResp.text();
+          throw new Error(`Upload init failed: ${err}`);
+        }
+
+        const { media_id, upload_url } = await uploadInitResp.json();
+        console.log('[Typefully] Got media_id:', media_id);
+
+        // Step 2: Upload to S3 with retry logic
+        let s3UploadSuccess = false;
+        let s3Attempts = 0;
+        const maxS3Attempts = 3;
+
+        while (!s3UploadSuccess && s3Attempts < maxS3Attempts) {
+          s3Attempts++;
+          console.log(`[Typefully] S3 upload attempt ${s3Attempts}/${maxS3Attempts}...`);
+
+          try {
+            const s3Resp = await fetch(upload_url, {
+              method: 'PUT',
+              body: imageBuffer,
+            });
+
+            console.log('[Typefully] S3 upload status:', s3Resp.status);
+
+            if (s3Resp.ok) {
+              s3UploadSuccess = true;
+              console.log('[Typefully] Upload successful! Waiting for processing...');
+            } else {
+              const s3Error = await s3Resp.text();
+              console.error('[Typefully] S3 error response:', s3Error);
+
+              if (s3Attempts < maxS3Attempts) {
+                console.log('[Typefully] Retrying S3 upload in 2 seconds...');
+                await new Promise(resolve => setTimeout(resolve, 2000));
+              } else {
+                throw new Error(`S3 upload failed after ${maxS3Attempts} attempts: ${s3Resp.status}`);
+              }
+            }
+          } catch (uploadError) {
+            if (s3Attempts < maxS3Attempts) {
+              console.error('[Typefully] S3 upload error:', uploadError.message);
+              console.log('[Typefully] Retrying S3 upload in 2 seconds...');
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            } else {
+              throw new Error(`S3 upload failed after ${maxS3Attempts} attempts: ${uploadError.message}`);
+            }
+          }
+        }
+
+        // Step 3: Wait for media to be processed (poll status with retries)
+        let mediaReady = false;
+        let attempts = 0;
+        const maxAttempts = 20; // Increased from 10 to 20 for larger images
+        const pollInterval = 1000; // 1 second between checks
+
+        while (!mediaReady && attempts < maxAttempts) {
+          attempts++;
+          console.log(`[Typefully] Checking media status (attempt ${attempts}/${maxAttempts})...`);
+
+          try {
+            const statusResp = await fetch(`https://api.typefully.com/v2/social-sets/${socialSetId}/media/${media_id}`, {
+              headers: { 'Authorization': `Bearer ${typefullyApiKey}` },
+              timeout: 5000 // 5 second timeout for status check
+            });
+
+            if (statusResp.ok) {
+              const statusData = await statusResp.json();
+              console.log('[Typefully] Media status:', statusData.status);
+
+              if (statusData.status === 'ready') {
+                mediaReady = true;
+                console.log('[Typefully] Media is ready!');
+              } else if (statusData.status === 'failed') {
+                throw new Error(`Media processing failed. Typefully error: ${JSON.stringify(statusData)}`);
+              } else if (statusData.status === 'processing') {
+                // Still processing, wait before next check
+                await new Promise(resolve => setTimeout(resolve, pollInterval));
+              } else {
+                // Unknown status
+                console.warn('[Typefully] Unknown media status:', statusData.status);
+                await new Promise(resolve => setTimeout(resolve, pollInterval));
+              }
+            } else {
+              console.error('[Typefully] Status check failed:', statusResp.status);
+              // Retry on status check failure
+              await new Promise(resolve => setTimeout(resolve, pollInterval));
+            }
+          } catch (statusError) {
+            console.error('[Typefully] Status check error:', statusError.message);
+            // Continue polling even if one check fails
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
+          }
+        }
+
+        if (!mediaReady) {
+          throw new Error(`Media processing timeout after ${maxAttempts} attempts. The image may be too large or Typefully is experiencing issues.`);
+        }
+
+        typefullyMediaId = media_id;
+        mediaUrl = null; // Clear since we're using media_id
+
+      } catch (uploadError) {
+        console.error('[Typefully] Upload failed:', uploadError.message);
+        mediaUrl = null;
+        typefullyMediaId = null;
+      }
+    }
+
+    // Check if we have any content to send
+    if (!content && !mediaUrl && !typefullyMediaId) {
+      return res.status(400).json({
+        error: 'Cannot create empty draft. Please provide either content text or an image.',
+      });
+    }
+
     // Determine which platform to use (default to Twitter if not specified)
     const platformKey = platform === 'linkedin' ? 'linkedin' : 'x';
-    console.log(`[Typefully] Creating ${platformKey} draft`);
+    console.log(`Creating ${platformKey} draft in Typefully`);
+    console.log(`Content: "${content || ''}", Media ID: ${typefullyMediaId || 'none'}`);
 
     // First, get the social sets to find the default one
     const setsResponse = await fetch('https://api.typefully.com/v2/social-sets', {
@@ -1197,7 +1332,7 @@ app.post('/api/typefully/draft', async (req, res) => {
     }
 
     const sets = await setsResponse.json();
-    console.log('[Typefully] Social sets response:', JSON.stringify(sets, null, 2));
+    console.log('Typefully social sets response:', JSON.stringify(sets, null, 2));
 
     // Handle different response structures
     let socialSetId;
@@ -1214,26 +1349,6 @@ app.post('/api/typefully/draft', async (req, res) => {
       });
     }
 
-    // Upload image to Typefully if provided
-    let mediaId = null;
-    if (mediaUrl && mediaUrl.startsWith('http://localhost')) {
-      try {
-        console.log('[Typefully] Localhost image detected, uploading to Typefully...');
-
-        // Read the image file from disk
-        const filename = mediaUrl.split('/').pop();
-        const imagePath = path.join(__dirname, 'public/library-images', filename);
-        const imageBuffer = await fs.readFile(imagePath);
-
-        // Upload to Typefully using proper media API
-        mediaId = await uploadImageToTypefully(socialSetId, imageBuffer, filename, typefullyApiKey);
-        console.log('[Typefully] Image uploaded with media_id:', mediaId);
-      } catch (uploadError) {
-        console.error('[Typefully] Failed to upload image:', uploadError.message);
-        // Continue without image rather than failing the whole request
-      }
-    }
-
     // Build the draft payload for Typefully API v2
     const draftPayload = {
       platforms: {
@@ -1242,12 +1357,17 @@ app.post('/api/typefully/draft', async (req, res) => {
           posts: [
             {
               text: content || '',
-              ...(mediaId && { media_ids: [mediaId] }),
             }
           ]
         }
       }
     };
+
+    // Add media if provided
+    if (typefullyMediaId) {
+      draftPayload.platforms[platformKey].posts[0].media_ids = [typefullyMediaId];
+      console.log('[Typefully] Using media_ids:', [typefullyMediaId]);
+    }
 
     console.log('Creating draft with payload:', JSON.stringify(draftPayload, null, 2));
 

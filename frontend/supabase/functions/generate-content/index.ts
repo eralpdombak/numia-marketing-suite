@@ -19,19 +19,63 @@ serve(async (req) => {
     }
 
     const systemPrompts: Record<string, string> = {
-      linkedin: `# CRITICAL OUTPUT FORMAT RULE
+      linkedin: `# ⚠️ CRITICAL OUTPUT FORMAT RULE - READ THIS FIRST ⚠️
 
-YOU MUST OUTPUT ONLY THE FINAL POST TEXT. NO META-COMMENTARY. NO OPTIONS. NO FORMATTING SYMBOLS.
+YOU ARE STRICTLY FORBIDDEN FROM INCLUDING ANY META-COMMENTARY OR FORMATTING.
 
-Do NOT include:
-- "Here's a post"
-- "Here are options"
-- "Option 1:", "Option 2:"
-- Any **bold**, *italic*, or markdown
-- Any explanatory text
-- Any commentary about the post
+YOUR FIRST WORD MUST BE THE FIRST WORD OF THE POST ITSELF.
 
-ONLY output the exact text that will be published on LinkedIn. Nothing else.
+❌ NEVER EVER START WITH:
+- "Here's" / "Here are"
+- "I'll" / "I've" / "Let me"
+- "Sure" / "Certainly" / "Of course"
+- "Option 1" / "Option 2" / "Version"
+- "Post" / "Draft"
+- "I need" / "Could you" / "What's"
+- ANY explanatory introduction
+- ANY questions asking for clarification
+
+❌ NEVER EVER ASK FOR MORE CONTEXT OR CLARIFICATION
+- Do NOT ask "What's the main message?"
+- Do NOT ask "Could you provide...?"
+- Do NOT ask for more details
+- JUST GENERATE THE CONTENT WITH WHAT YOU HAVE
+
+❌ NEVER EVER ADD ANALYSIS OR EXPLANATION AFTER THE CONTENT
+- Do NOT explain what you just wrote
+- Do NOT add "The Hook:", "FOMO Elements:", "Why this works:", etc.
+- Do NOT say "This post is X words..."
+- Do NOT add breakdowns or analysis
+- JUST WRITE THE CONTENT AND STOP
+
+❌ NEVER EVER USE:
+- **bold** (asterisks for bold)
+- *italic* (asterisks for italic)
+- __underline__ (underscores)
+- # Headers (markdown headers)
+- Any markdown formatting whatsoever
+
+✅ YOU MUST:
+- Start IMMEDIATELY with the post content itself
+- Use ONLY plain text with line breaks
+- Write EXACTLY what the audience will read
+- Output the raw, unformatted post text
+- GENERATE CONTENT even if the prompt is vague
+- INFER what makes sense and just create it
+
+EXAMPLE OF WHAT NOT TO DO:
+"Here's a LinkedIn post about your topic:
+
+**This is wrong**
+
+You just spent 6 hours debugging..."
+
+EXAMPLE OF WHAT TO DO:
+"You just spent 6 hours debugging why token balances won't update. The code's fine. But Polygon is 90 seconds behind.
+
+This is what happens when you're duct-taping together three providers. Sound familiar?"
+
+IF YOU START WITH META-COMMENTARY, ASK QUESTIONS, OR USE MARKDOWN FORMATTING, YOU HAVE FAILED.
 
 ---
 
@@ -374,19 +418,66 @@ That's Numia. It's not just an API; it's your Tuesday back.
 
 That's it. Nothing before it. Nothing after it. Just the post text.`,
 
-      twitter: `# CRITICAL OUTPUT FORMAT RULE
+      twitter: `# ⚠️ CRITICAL OUTPUT FORMAT RULE - READ THIS FIRST ⚠️
 
-YOU MUST OUTPUT ONLY THE FINAL THREAD TEXT. NO META-COMMENTARY. NO OPTIONS. NO FORMATTING SYMBOLS.
+YOU ARE STRICTLY FORBIDDEN FROM INCLUDING ANY META-COMMENTARY OR FORMATTING.
 
-Do NOT include:
-- "Here's a thread"
-- "Here are options"
-- "Option 1:", "Option 2:"
-- Any **bold**, *italic*, or markdown
-- Any explanatory text
-- Any commentary about the thread
+YOUR FIRST WORD MUST BE THE FIRST WORD OF THE THREAD ITSELF.
 
-ONLY output the exact text that will be published on Twitter/X. Nothing else.
+❌ NEVER EVER START WITH:
+- "Here's" / "Here are"
+- "I'll" / "I've" / "Let me"
+- "Sure" / "Certainly" / "Of course"
+- "Option 1" / "Option 2" / "Version"
+- "Thread" / "Tweet 1:" / "Draft"
+- "🧵" or any thread indicators
+- "I need" / "Could you" / "What's"
+- ANY explanatory introduction
+- ANY questions asking for clarification
+
+❌ NEVER EVER ASK FOR MORE CONTEXT OR CLARIFICATION
+- Do NOT ask "What's the main message?"
+- Do NOT ask "Could you provide...?"
+- Do NOT ask for more details
+- JUST GENERATE THE CONTENT WITH WHAT YOU HAVE
+
+❌ NEVER EVER ADD ANALYSIS OR EXPLANATION AFTER THE CONTENT
+- Do NOT explain what you just wrote
+- Do NOT add "The Hook:", "FOMO Elements:", "Why this works:", etc.
+- Do NOT say "This post is X words..."
+- Do NOT add breakdowns or analysis
+- JUST WRITE THE CONTENT AND STOP
+
+❌ NEVER EVER USE:
+- **bold** (asterisks for bold)
+- *italic* (asterisks for italic)
+- __underline__ (underscores)
+- # Headers (markdown headers)
+- Any markdown formatting whatsoever
+
+✅ YOU MUST:
+- Start IMMEDIATELY with the first tweet content
+- Use ONLY plain text with line breaks between tweets
+- Write EXACTLY what the audience will read
+- Output the raw, unformatted thread text
+- Separate tweets with blank lines ONLY
+- GENERATE CONTENT even if the prompt is vague
+- INFER what makes sense and just create it
+
+EXAMPLE OF WHAT NOT TO DO:
+"Here's a Twitter thread about your topic:
+
+Tweet 1:
+**Wild that** we normalize infrastructure..."
+
+EXAMPLE OF WHAT TO DO:
+"Wild that we normalize infrastructure that makes you refresh 5 times to see if the number's real
+
+Here's what's actually happening:
+
+Your provider pulls from multiple nodes..."
+
+IF YOU START WITH META-COMMENTARY, ASK QUESTIONS, OR USE MARKDOWN FORMATTING, YOU HAVE FAILED.
 
 ---
 
@@ -800,19 +891,35 @@ That's it. Nothing before it. Nothing after it. Just the thread text.`,
         messages: [
           {
             role: "user",
-            content: `CRITICAL INSTRUCTIONS - READ FIRST:
+            content: `⚠️ CRITICAL INSTRUCTIONS - YOUR FIRST CHARACTER MUST BE THE POST CONTENT ⚠️
 
-1. Output ONLY the final ${platform} post/thread text
-2. NO "Here's a post", NO "Option 1:", NO meta-commentary
-3. NO markdown formatting (**bold**, *italic*, etc.)
-4. NO emojis unless the user specifically requests them
-5. Start your response IMMEDIATELY with the post content
-6. Plain text only with line breaks for white space
+FORBIDDEN - DO NOT INCLUDE:
+❌ "Here's" / "Here are" / "I'll" / "I've" / "Let me" / "Sure" / "Certainly"
+❌ "Option 1" / "Option 2" / "Version" / "Post" / "Thread" / "Tweet 1"
+❌ "I need" / "Could you" / "What's" / "Give me"
+❌ **bold** / *italic* / __underline__ / # headers
+❌ ANY meta-commentary whatsoever
+❌ ANY markdown formatting symbols
+❌ ANY explanatory text before the post
+❌ ANY questions asking for more context or clarification
+❌ ANY analysis or explanation AFTER the content ("The Hook:", "FOMO Elements:", "This post is X words", etc.)
+❌ Emojis (unless user explicitly requests)
+
+REQUIRED - YOU MUST:
+✅ Your VERY FIRST CHARACTER must be the FIRST CHARACTER of the ${platform} post/thread
+✅ Output ONLY the exact text that will be published
+✅ Use ONLY plain text with line breaks
+✅ Write EXACTLY what the audience will read
+✅ GENERATE CONTENT even if the prompt is vague - use your best judgment
+✅ NEVER ask for clarification - just create the content
+✅ When you finish writing the content, STOP IMMEDIATELY - no analysis, no explanation
 
 User's brain dump:
 ${prompt}
 
-Remember: Output the EXACT TEXT that will be published. Nothing else.`
+START YOUR RESPONSE NOW WITH THE POST CONTENT. NO INTRODUCTION. NO EXPLANATION. NO QUESTIONS. JUST THE POST.
+
+WHEN THE CONTENT IS DONE, STOP WRITING. DO NOT ADD ANYTHING AFTER THE CONTENT ENDS.`
           },
         ],
         stream: true,

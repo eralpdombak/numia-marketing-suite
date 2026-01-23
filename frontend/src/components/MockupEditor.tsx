@@ -319,7 +319,7 @@ export function MockupEditor() {
               {image && (
                 <button
                   onClick={handleRemoveImage}
-                  className="px-4 py-2 text-[11px] font-mono uppercase tracking-wider text-zinc-600 hover:text-red-400 border border-zinc-800 hover:border-red-900/50 bg-zinc-950 hover:bg-red-950/20 transition-colors duration-150 flex items-center gap-2"
+                  className="px-4 py-2 text-[11px] font-mono uppercase tracking-wider text-zinc-600 hover:text-red-400 border border-zinc-800 hover:border-red-900/50 bg-zinc-950 hover:bg-red-950/20 transition-colors duration-300 ease-out flex items-center gap-2"
                 >
                   <Trash2 className="w-3 h-3" />
                   Remove
@@ -368,7 +368,7 @@ export function MockupEditor() {
               value={titleInput}
               onChange={(e) => setTitleInput(e.target.value)}
               placeholder="My awesome mockup..."
-              className="w-full bg-zinc-900 border border-zinc-800 text-zinc-300 placeholder:text-zinc-600 font-mono text-sm px-4 py-3 focus:outline-none focus:border-zinc-600 transition-colors"
+              className="w-full bg-zinc-900 border border-zinc-800 text-zinc-300 placeholder:text-zinc-600 font-mono text-sm px-4 py-3 focus:outline-none focus:border-zinc-600 transition-colors duration-300 ease-out"
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === "Enter") {

@@ -10,6 +10,7 @@ import bg1 from "@/assets/backgrounds/bg-1.svg";
 import bg2 from "@/assets/backgrounds/bg-2.svg";
 import bg3 from "@/assets/backgrounds/bg-3.svg";
 import bg4 from "@/assets/backgrounds/bg-4.svg";
+import bg5 from "@/assets/backgrounds/bg-5.png";
 
 interface BackgroundPreset {
   id: string;
@@ -21,7 +22,7 @@ const backgroundPresets: BackgroundPreset[] = [
   { id: "preset-1", name: "Gradient 1", image: bg1 },
   { id: "preset-2", name: "Gradient 2", image: bg2 },
   { id: "preset-3", name: "Gradient 3", image: bg3 },
-  { id: "preset-4", name: "Gradient 4", image: bg4 },
+  { id: "preset-5", name: "Frame 94", image: bg5 },
 ];
 
 interface ControlPanelProps {

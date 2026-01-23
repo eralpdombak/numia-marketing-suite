@@ -5,7 +5,6 @@ import {
   ApertureIcon,
   ArchiveIcon,
   NotesIcon,
-  BrainIcon,
   CloseIcon,
 } from "@/components/icons";
 
@@ -13,7 +12,6 @@ export const navItems = [
   { path: "/notes", label: "Notes", icon: NotesIcon, description: "Quick ideas" },
   { path: "/shots", label: "Shots", icon: ApertureIcon, description: "Device mockups" },
   { path: "/library", label: "Library", icon: ArchiveIcon, description: "Content assets" },
-  { path: "/intelligence", label: "Intelligence", icon: BrainIcon, description: "Knowledge base" },
 ];
 
 interface NavigationOverlayProps {
@@ -84,19 +82,10 @@ export function NavigationOverlay({ isOpen, onClose }: NavigationOverlayProps) {
         isOpen ? "pointer-events-auto" : "pointer-events-none"
       )}
     >
-      {/* Background - Frosted glass effect */}
+      {/* Combined background - Frosted glass effect with grid */}
       <div
         className={cn(
           "absolute inset-0 bg-zinc-950/40 backdrop-blur-xl transition-opacity duration-400",
-          contentVisible ? "opacity-100" : "opacity-0"
-        )}
-        onClick={onClose}
-      />
-
-      {/* Subtle grid overlay */}
-      <div
-        className={cn(
-          "absolute inset-0 transition-opacity duration-500",
           contentVisible ? "opacity-100" : "opacity-0"
         )}
         style={{
@@ -105,6 +94,7 @@ export function NavigationOverlay({ isOpen, onClose }: NavigationOverlayProps) {
             linear-gradient(90deg, hsl(var(--border) / 0.15) 1px, transparent 1px)
           `,
           backgroundSize: '60px 60px',
+          backgroundPosition: 'center, center',
         }}
         onClick={onClose}
       />
@@ -151,7 +141,7 @@ export function NavigationOverlay({ isOpen, onClose }: NavigationOverlayProps) {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Module grid */}
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               {navItems.map((item, index) => {
                 const isActive = location.pathname === item.path;
                 const isHovered = hoveredIndex === index;
@@ -164,13 +154,16 @@ export function NavigationOverlay({ isOpen, onClose }: NavigationOverlayProps) {
                     onMouseEnter={() => setHoveredIndex(index)}
                     onMouseLeave={() => setHoveredIndex(null)}
                     className={cn(
-                      "group relative aspect-square p-4 transition-all duration-100 focus-ring",
+                      "group relative aspect-square p-4 focus-ring",
                       "border flex flex-col items-center justify-center gap-3",
+                      "transition-all duration-300 ease-out",
                       isActive
                         ? "bg-muted/30 border-muted-foreground/40"
-                        : "bg-card/30 border-border/50 hover:bg-muted/30 hover:border-muted-foreground/40 hover:scale-[1.02] hover:shadow-lg hover:shadow-muted/20"
+                        : isHovered
+                          ? "bg-muted/30 border-muted-foreground/40 scale-[1.02] shadow-lg shadow-muted/20"
+                          : "bg-card/30 border-border/50"
                     )}
-                    style={{ 
+                    style={{
                       transitionDelay: contentVisible ? `${index * 40}ms` : "0ms",
                       opacity: contentVisible ? 1 : 0,
                       transform: contentVisible ? 'translateY(0)' : 'translateY(10px)',
@@ -178,9 +171,9 @@ export function NavigationOverlay({ isOpen, onClose }: NavigationOverlayProps) {
                   >
                     {/* Status indicator */}
                     <div className="absolute top-3 right-3 flex items-center gap-1.5">
-                      <div 
+                      <div
                         className={cn(
-                          "w-1.5 h-1.5 rounded-full",
+                          "w-1.5 h-1.5 rounded-full transition-colors duration-300 ease-out",
                           isActive ? "bg-[hsl(var(--success))]" : "bg-muted-foreground/30"
                         )}
                       />
@@ -190,25 +183,26 @@ export function NavigationOverlay({ isOpen, onClose }: NavigationOverlayProps) {
                     <div className="absolute top-3 left-3 font-mono text-[9px] text-muted-foreground/40">
                       0{index + 1}
                     </div>
-                    
+
                     {/* Icon container */}
                     <div
                       className={cn(
-                        "w-12 h-12 border flex items-center justify-center transition-all duration-100",
+                        "w-12 h-12 border flex items-center justify-center",
+                        "transition-all duration-300 ease-out",
                         isActive
                           ? "border-muted-foreground/50 bg-muted/30"
                           : isHovered
-                            ? "border-muted-foreground/50 bg-muted/30 scale-110"
+                            ? "border-muted-foreground/50 bg-muted/30"
                             : "border-border/60"
                       )}
                     >
                       <Icon
                         className={cn(
-                          "w-5 h-5 transition-all duration-100",
+                          "w-5 h-5 transition-all duration-300 ease-out",
                           isActive
                             ? "text-foreground"
                             : isHovered
-                              ? "text-foreground brightness-125"
+                              ? "text-foreground"
                               : "text-muted-foreground"
                         )}
                       />
@@ -218,11 +212,11 @@ export function NavigationOverlay({ isOpen, onClose }: NavigationOverlayProps) {
                     <div className="text-center">
                       <div
                         className={cn(
-                          "font-mono text-[11px] uppercase tracking-wider transition-all duration-100 mb-0.5",
+                          "font-mono text-[11px] uppercase tracking-wider transition-all duration-300 ease-out mb-0.5",
                           isActive
                             ? "text-foreground"
                             : isHovered
-                              ? "text-foreground brightness-110"
+                              ? "text-foreground"
                               : "text-muted-foreground"
                         )}
                       >
@@ -230,11 +224,11 @@ export function NavigationOverlay({ isOpen, onClose }: NavigationOverlayProps) {
                       </div>
                       <div
                         className={cn(
-                          "font-mono text-[9px] uppercase tracking-wider transition-all duration-100",
+                          "font-mono text-[9px] uppercase tracking-wider transition-all duration-300 ease-out",
                           isActive
                             ? "text-muted-foreground"
                             : isHovered
-                              ? "text-muted-foreground brightness-110"
+                              ? "text-muted-foreground"
                               : "text-muted-foreground/50"
                         )}
                       >

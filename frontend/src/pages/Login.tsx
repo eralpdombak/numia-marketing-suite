@@ -66,7 +66,7 @@ export default function Login() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div
             className={cn(
-              "transition-transform duration-100",
+              "transition-transform duration-300 ease-out",
               isShaking && "animate-shake"
             )}
           >

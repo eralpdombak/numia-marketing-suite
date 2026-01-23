@@ -203,6 +203,15 @@ function ExportIcon({ className }: { className?: string }) {
   );
 }
 
+function ComposeIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className={className}>
+      <path d="M12 5v14M5 12h14" />
+      <circle cx="12" cy="12" r="10" />
+    </svg>
+  );
+}
+
 const platformIcons: Record<string, React.FC<{ className?: string }>> = {
   linkedin: LinkedInIcon,
   twitter: TwitterIcon,
@@ -235,13 +244,22 @@ export default function Library() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
-  
+
   // UX enhancements
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<SortOption>("newest");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [platformFilter, setPlatformFilter] = useState<string | null>(null);
+
+  // Compose modal state
+  const [showCompose, setShowCompose] = useState(false);
+  const [composeText, setComposeText] = useState<DbLibraryItem | null>(null);
+  const [composeImage, setComposeImage] = useState<LocalLibraryItem | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [composeStep, setComposeStep] = useState<'text' | 'image'>('text');
+  const [composeTextSearch, setComposeTextSearch] = useState('');
+  const [composeImageSearch, setComposeImageSearch] = useState('');
 
   useEffect(() => {
     loadLibraryItems();
@@ -683,6 +701,55 @@ export default function Library() {
     }
   };
 
+  const handleComposeExport = async () => {
+    if (!composeText && !composeImage) {
+      toast.error("Please select at least a text or image");
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const API_URL = import.meta.env.VITE_LOCAL_MODE === 'true'
+        ? 'http://localhost:3001'
+        : '';
+
+      const content = composeText ? cleanLinkedInContent(composeText.content, composeText.platform) : '';
+      const mediaUrl = composeImage ? composeImage.src : undefined;
+      const platform = composeText?.platform || undefined;
+
+      const response = await fetch(`${API_URL}/api/typefully/draft`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content,
+          mediaUrl,
+          platform,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create draft');
+      }
+
+      const result = await response.json();
+      toast.success(result.message || "Draft created in Typefully!");
+      console.log("[Library] Composed draft created:", result);
+
+      // Close modal and reset
+      setShowCompose(false);
+      setComposeText(null);
+      setComposeImage(null);
+    } catch (error) {
+      console.error("[Library] Compose export error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to export to Typefully");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const toggleSelection = useCallback((id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -778,6 +845,15 @@ export default function Library() {
               </div>
 
               <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowCompose(true)}
+                  disabled={textItems.length === 0 && imageItems.length === 0}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 hover:border-blue-500/50 font-mono text-[10px] uppercase tracking-wider transition-all duration-300 ease-out disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ComposeIcon className="w-3.5 h-3.5" />
+                  Compose
+                </button>
+                <div className="h-3 w-px bg-zinc-800" />
                 <span className="font-mono text-[10px] text-zinc-600 uppercase tracking-wider">
                   {currentItems.length} items
                 </span>
@@ -1051,6 +1127,220 @@ export default function Library() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Compose Modal - Combine Text + Image */}
+      <Dialog open={showCompose} onOpenChange={(open) => {
+        if (!open) {
+          setShowCompose(false);
+          setComposeText(null);
+          setComposeImage(null);
+          setComposeStep('text');
+          setComposeTextSearch('');
+          setComposeImageSearch('');
+        }
+      }}>
+        <DialogContent className="max-w-3xl w-full max-h-[90vh] bg-zinc-950 border border-zinc-900 p-0 overflow-hidden flex flex-col">
+          <DialogTitle className="sr-only">Compose Post</DialogTitle>
+
+          {/* Fixed Header */}
+          <div className="p-8 pb-4 border-b border-zinc-900">
+            <h2 className="font-mono text-sm uppercase tracking-wider text-zinc-300 mb-2">
+              {composeStep === 'text' ? 'Step 1: Select Text' : 'Step 2: Select Image'}
+            </h2>
+            <p className="font-mono text-[11px] text-zinc-600">
+              {composeStep === 'text' ? 'Choose a text post from your library' : 'Choose an image from your library'}
+            </p>
+          </div>
+
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto p-8 pt-6">
+            {composeStep === 'text' ? (
+              <div>
+                {/* Search */}
+                <div className="mb-4">
+                  <div className="relative">
+                    <SearchIcon className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-700" />
+                    <input
+                      type="text"
+                      value={composeTextSearch}
+                      onChange={(e) => setComposeTextSearch(e.target.value)}
+                      placeholder="Search text posts..."
+                      className="w-full bg-transparent border-b border-zinc-800 text-zinc-300 placeholder:text-zinc-700 font-mono text-sm pl-6 pr-8 py-2 focus:outline-none focus:border-zinc-600 transition-colors"
+                    />
+                    {composeTextSearch && (
+                      <button
+                        onClick={() => setComposeTextSearch('')}
+                        className="absolute right-0 top-1/2 -translate-y-1/2 text-zinc-700 hover:text-zinc-500 transition-colors"
+                      >
+                        <CloseIcon className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Text Items */}
+                <div className="space-y-2">
+                  {textItems
+                    .filter(item => {
+                      if (!composeTextSearch) return true;
+                      const query = composeTextSearch.toLowerCase();
+                      return (
+                        item.content.toLowerCase().includes(query) ||
+                        (item.platform && item.platform.toLowerCase().includes(query)) ||
+                        (item.title && item.title.toLowerCase().includes(query))
+                      );
+                    })
+                    .map((item) => (
+                      <div
+                        key={item.id}
+                        onClick={() => setComposeText(item)}
+                        className={cn(
+                          "p-4 border cursor-pointer transition-all",
+                          composeText?.id === item.id
+                            ? "border-blue-500/50 bg-blue-500/10"
+                            : "border-zinc-800 hover:border-zinc-700"
+                        )}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          {item.platform && (
+                            <span className="text-[10px] text-zinc-600 uppercase font-mono">
+                              {getPlatformLabel(item.platform)}
+                            </span>
+                          )}
+                          <span className="text-[10px] text-zinc-700 font-mono">
+                            {new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </span>
+                        </div>
+                        <p className="text-xs text-zinc-400 line-clamp-3 leading-relaxed">
+                          {cleanLinkedInContent(item.content, item.platform)}
+                        </p>
+                      </div>
+                    ))}
+                  {textItems.filter(item => {
+                    if (!composeTextSearch) return true;
+                    const query = composeTextSearch.toLowerCase();
+                    return (
+                      item.content.toLowerCase().includes(query) ||
+                      (item.platform && item.platform.toLowerCase().includes(query)) ||
+                      (item.title && item.title.toLowerCase().includes(query))
+                    );
+                  }).length === 0 && (
+                    <div className="text-center py-12 text-zinc-700 font-mono text-[11px]">
+                      {composeTextSearch ? 'No matching text posts' : 'No text items'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div>
+                {/* Search */}
+                <div className="mb-4">
+                  <div className="relative">
+                    <SearchIcon className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-700" />
+                    <input
+                      type="text"
+                      value={composeImageSearch}
+                      onChange={(e) => setComposeImageSearch(e.target.value)}
+                      placeholder="Search images by title..."
+                      className="w-full bg-transparent border-b border-zinc-800 text-zinc-300 placeholder:text-zinc-700 font-mono text-sm pl-6 pr-8 py-2 focus:outline-none focus:border-zinc-600 transition-colors"
+                    />
+                    {composeImageSearch && (
+                      <button
+                        onClick={() => setComposeImageSearch('')}
+                        className="absolute right-0 top-1/2 -translate-y-1/2 text-zinc-700 hover:text-zinc-500 transition-colors"
+                      >
+                        <CloseIcon className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Image Items */}
+                <div className="grid grid-cols-3 gap-3">
+                  {imageItems
+                    .filter(item => {
+                      if (!composeImageSearch) return true;
+                      const query = composeImageSearch.toLowerCase();
+                      return item.title && item.title.toLowerCase().includes(query);
+                    })
+                    .map((item) => (
+                      <div key={item.id} className="space-y-2">
+                        <div
+                          onClick={() => setComposeImage(item)}
+                          className={cn(
+                            "aspect-video overflow-hidden border cursor-pointer transition-all",
+                            composeImage?.id === item.id
+                              ? "border-blue-500/50 ring-2 ring-blue-500/30"
+                              : "border-zinc-800 hover:border-zinc-700"
+                          )}
+                        >
+                          <img
+                            src={item.src}
+                            alt="Thumbnail"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <span className="block text-[10px] text-zinc-700 font-mono text-center">
+                          {new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                      </div>
+                    ))}
+                  {imageItems.filter(item => {
+                    if (!composeImageSearch) return true;
+                    const query = composeImageSearch.toLowerCase();
+                    return item.title && item.title.toLowerCase().includes(query);
+                  }).length === 0 && (
+                    <div className="col-span-3 text-center py-12 text-zinc-700 font-mono text-[11px]">
+                      {composeImageSearch ? 'No matching images' : 'No image items'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Fixed Footer */}
+          <div className="p-8 pt-4 border-t border-zinc-900 bg-zinc-950">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => {
+                  if (composeStep === 'image') {
+                    setComposeStep('text');
+                  } else {
+                    setShowCompose(false);
+                    setComposeText(null);
+                    setComposeImage(null);
+                    setComposeStep('text');
+                    setComposeTextSearch('');
+                    setComposeImageSearch('');
+                  }
+                }}
+                className="font-mono text-xs uppercase tracking-wider text-zinc-600 hover:text-zinc-400 transition-colors duration-300 ease-out"
+              >
+                {composeStep === 'image' ? 'Back' : 'Cancel'}
+              </button>
+
+              {composeStep === 'text' ? (
+                <button
+                  onClick={() => setComposeStep('image')}
+                  disabled={!composeText}
+                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-mono text-xs uppercase tracking-wider transition-colors duration-300 ease-out disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              ) : (
+                <button
+                  onClick={handleComposeExport}
+                  disabled={(!composeText && !composeImage) || isExporting}
+                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-mono text-xs uppercase tracking-wider transition-colors duration-300 ease-out disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isExporting ? "Exporting..." : "Export to Typefully"}
+                </button>
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

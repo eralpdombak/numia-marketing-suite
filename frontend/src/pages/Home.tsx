@@ -154,23 +154,18 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Subtle grid background */}
-      <div
-        className="absolute inset-0 opacity-[0.03]"
-        style={{
-          backgroundImage: `
-            linear-gradient(hsl(var(--foreground)) 1px, transparent 1px),
-            linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)
-          `,
-          backgroundSize: '80px 80px',
-        }}
-      />
-
-      {/* Radial gradient overlay */}
+      {/* Combined grid background with radial gradient */}
       <div
         className="absolute inset-0"
         style={{
-          background: 'radial-gradient(circle at 50% 50%, transparent 0%, hsl(var(--background)) 100%)',
+          backgroundImage: `
+            radial-gradient(circle at 50% 50%, transparent 0%, hsl(var(--background)) 100%),
+            linear-gradient(hsl(var(--foreground)) 1px, transparent 1px),
+            linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)
+          `,
+          backgroundSize: '100% 100%, 80px 80px, 80px 80px',
+          backgroundPosition: 'center, center, center',
+          opacity: 0.03,
         }}
       />
 
@@ -241,7 +236,7 @@ export default function Home() {
             className="absolute inset-0 flex items-center justify-center transition-transform duration-700 group-hover:rotate-45"
             style={{ transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)' }}
           >
-            <CompassIcon className="w-full h-full text-muted-foreground group-hover:text-white transition-colors duration-300" />
+            <CompassIcon className="w-full h-full text-muted-foreground group-hover:text-white transition-colors duration-300 ease-out" />
           </div>
         </button>
       </main>

@@ -75,7 +75,7 @@ export const MockupCanvas = forwardRef<HTMLElement, MockupCanvasProps>(
     const backgroundStyle = isImageBackground
       ? {
           backgroundImage: `url(${settings.backgroundColor})`,
-          backgroundSize: 'cover',
+          backgroundSize: 'contain',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat'
         }
