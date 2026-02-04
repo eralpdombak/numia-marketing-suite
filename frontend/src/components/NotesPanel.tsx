@@ -28,11 +28,18 @@ export function NotesPanel() {
       });
 
       if (error) {
-        throw error;
+        // Extract error message from FunctionsHttpError or FunctionsRelayError
+        const errorMessage = error.message || "Failed to generate posts";
+        throw new Error(errorMessage);
+      }
+
+      // Check if data contains an error field
+      if (data && data.error) {
+        throw new Error(data.error);
       }
 
       if (!data || !data.posts || data.posts.length === 0) {
-        throw new Error("No posts generated");
+        throw new Error("No posts were generated. Please try again.");
       }
 
       const posts: GeneratedPost[] = data.posts.map((post: any, index: number) => ({
@@ -44,8 +51,9 @@ export function NotesPanel() {
       setGeneratedPosts(posts);
       toast.success(`Generated ${posts.length} ${platform} post${posts.length > 1 ? 's' : ''}`);
     } catch (error) {
-      toast.error("Failed to generate posts");
-      console.error(error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to generate posts";
+      toast.error(errorMessage);
+      console.error("Generation error:", error);
     } finally {
       setIsGenerating(false);
     }

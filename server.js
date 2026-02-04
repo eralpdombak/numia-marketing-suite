@@ -331,13 +331,40 @@ app.post('/api/generate-content', async (req, res) => {
       // Questions asking for clarification (BLOCK THESE IMMEDIATELY)
       /^I need more context/i,
       /^I need additional/i,
+      /^I need to/i,
       /^Could you provide/i,
       /^Could you/i,
       /^What's the/i,
       /^What is the/i,
+      /^What would you/i,
       /^Give me/i,
       /^Can you/i,
       /^Would you/i,
+      /Some options/i,
+      /^What topic/i,
+      /^What should/i,
+      /^For example/i,
+      /^For reference/i,
+      /are we talking about/i,
+      /Are you looking/i,
+      /Give me the angle/i,
+      /Give me the context/i,
+      /^Tell me/i,
+      /^Share/i,
+      /^Which/i,
+      /Something else entirely/i,
+      /looking to promote/i,
+      /standalone thought/i,
+      /specific from recent/i,
+      /I can see from your/i,
+      // File/system references
+      /The system is asking/i,
+      /write access/i,
+      /create the file/i,
+      /save the file/i,
+      /file at \/Users/i,
+      /output\/blog-posts/i,
+      /\.md$/i,
       // Regular meta-commentary
       /^I need permission/i,
       /^I need to/i,
@@ -391,23 +418,72 @@ app.post('/api/generate-content', async (req, res) => {
     // NUCLEAR: Patterns that indicate meta-analysis AFTER content
     // If we see these, STOP streaming immediately (content is done, rest is commentary)
     const postContentMetaPatterns = [
+      // Blog-specific meta-commentary (MOST COMMON)
+      /^[!?]?\s*I'?ve\s+created\s+a\s+blog\s+post/i,
+      /^Unique\s+aspects?:/i,
+      /^Human\s+touches?\s+(?:added|included)?:/i,
+      /^No\s+Numia\s+pitch/i,
+      /^The\s+focus\s+is/i,
+      /^Length:/i,
+      /^~?\d+[,\d]*\s+words?\s/i,
+
+      // Section headers for analysis
       /^Key elements I/i,
       /^Key elements:/i,
       /^The Hook:/i,
       /^Hook:/i,
+      /^Structure:/i,
+      /^Tone:/i,
+      /^Voice:/i,
+      /^Style:/i,
+      /^Variation techniques/i,
+      /^Human touches:/i,
+      /^Human elements:/i,
       /^FOMO Elements:/i,
       /^Product Integration:/i,
       /^Call to Action:/i,
       /^Why this works:/i,
+      /^What makes this/i,
+
+      // "This [content type]..." analysis
       /^This post/i,
       /^This thread/i,
       /^This approach/i,
+      /^This article/i,
+      /^This blog/i,
+      /^The post explains/i,
+      /^The article/i,
+      /^The blog post is/i,
+
+      // "I [verb]..." explanations
       /^I used/i,
       /^I included/i,
       /^I incorporated/i,
       /^I baked in/i,
+      /^I've created/i,
+
+      // Word count and meta info
       /^Word count:/i,
       /^Character count:/i,
+      /approximately \d+ words/i,
+      /^It's approximately/i,
+      /it's a ~?\d+[,\d]* word/i,
+      /This is a ~?\d+[,\d]* word/i,
+      /word piece that/i,
+
+      // Analysis bullet points
+      /^-\s+(?:Structure|Hook|Tone|Length|Human touches|Opinion|Code example|Sentence|Rule-breaking|Specific|Real developer|Conversational):/i,
+
+      // Other meta patterns
+      /maintains engagement/i,
+      /^Opens with/i,
+      /^Positioning/i,
+      /^Real technical details/i,
+      /^Subheadings that/i,
+      /^No AI clich/i,
+      /without feeling like/i,
+      /The blog post is ready/i,
+      /The post is ready/i,
     ];
 
     const shouldSkipPreContentLine = (line) => {
@@ -417,15 +493,27 @@ app.post('/api/generate-content', async (req, res) => {
       return preContentMetaPatterns.some(pattern => pattern.test(trimmed));
     };
 
-    const isPostContentMeta = (line) => {
-      const trimmed = line.trim();
-      if (!trimmed) return false;
-      return postContentMetaPatterns.some(pattern => pattern.test(trimmed));
+    const isPostContentMeta = (text) => {
+      return postContentMetaPatterns.some(pattern => pattern.test(text));
     };
+
+    let fullAccumulatedContent = '';
 
     claudeProcess.stdout.on('data', (data) => {
       const text = data.toString();
       buffer += text;
+      fullAccumulatedContent += text;
+
+      // Check the FULL accumulated content for post-content meta patterns
+      if (hasStartedSending && isPostContentMeta(fullAccumulatedContent)) {
+        console.log('🛑 Detected post-content meta-analysis in accumulated content');
+        // Stop the Claude process
+        claudeProcess.kill();
+        // Send final marker and end response
+        res.write('data: [DONE]\n\n');
+        res.end();
+        return;
+      }
 
       // Process line by line to skip only initial meta-commentary
       const lines = buffer.split('\n');
@@ -434,16 +522,6 @@ app.post('/api/generate-content', async (req, res) => {
       buffer = lines.pop() || '';
 
       for (const line of lines) {
-        // STOP IMMEDIATELY if we detect post-content meta-analysis
-        if (hasStartedSending && isPostContentMeta(line)) {
-          console.log('🛑 Detected post-content meta-analysis, stopping stream:', line.substring(0, 50));
-          // Stop the Claude process
-          claudeProcess.kill();
-          // Send final marker and end response
-          res.write('data: [DONE]\n\n');
-          res.end();
-          return;
-        }
 
         // Only skip pre-content meta-commentary
         if (!hasStartedSending) {
@@ -1396,6 +1474,7 @@ app.post('/api/typefully/draft', async (req, res) => {
     res.json({
       success: true,
       draft: result,
+      private_url: result.private_url,
       message: `Draft created successfully in Typefully for ${platformKey === 'x' ? 'Twitter' : 'LinkedIn'}`
     });
 

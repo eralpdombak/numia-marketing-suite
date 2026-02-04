@@ -36,6 +36,7 @@ interface ControlPanelProps {
   onDeletePreset: (id: string) => void;
   onSaveToLibrary: () => void;
   isSavingToLibrary: boolean;
+  hasImage: boolean;
 }
 
 const devices: { type: DeviceType; label: string }[] = [
@@ -87,11 +88,11 @@ function TrashIcon({ className }: { className?: string }) {
 
 function ChevronIcon({ className, open }: { className?: string; open?: boolean }) {
   return (
-    <svg 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="1.5" 
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
       className={cn(className, "transition-transform duration-200", open && "rotate-180")}
     >
       <path d="M6 9l6 6 6-6" />
@@ -129,7 +130,8 @@ export function ControlPanel({
   onLoadPreset,
   onDeletePreset,
   onSaveToLibrary,
-  isSavingToLibrary
+  isSavingToLibrary,
+  hasImage
 }: ControlPanelProps) {
   const [presetName, setPresetName] = useState("");
   const [showSaveInput, setShowSaveInput] = useState(false);
@@ -146,7 +148,7 @@ export function ControlPanel({
   return (
     <div className="h-full flex flex-col">
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         <div className="space-y-5">
             {/* Border Selection */}
       <div className="space-y-3">
@@ -177,6 +179,7 @@ export function ControlPanel({
             <span className="text-[10px] text-zinc-500 font-mono tabular-nums bg-zinc-800 px-2 py-0.5">{settings.imageScale}%</span>
           </div>
           <Slider
+            key={`size-${settings.imageScale}`}
             value={[settings.imageScale]}
             onValueChange={([value]) => onSettingsChange({ imageScale: Math.round(value) })}
             min={30}
@@ -193,6 +196,7 @@ export function ControlPanel({
             <span className="text-[10px] text-zinc-500 font-mono tabular-nums bg-zinc-800 px-2 py-0.5">{Math.round(((settings.browserScale - 58) / 42) * 100)}%</span>
           </div>
           <Slider
+            key={`browser-size-${settings.browserScale}`}
             value={[settings.browserScale]}
             onValueChange={([value]) => onSettingsChange({ browserScale: Math.round(value) })}
             min={58}
@@ -210,6 +214,7 @@ export function ControlPanel({
             <span className="text-[10px] text-zinc-500 font-mono tabular-nums bg-zinc-800 px-2 py-0.5">{settings.imageRadius}px</span>
           </div>
           <Slider
+            key={`radius-${settings.imageRadius}`}
             value={[settings.imageRadius]}
             onValueChange={([value]) => onSettingsChange({ imageRadius: Math.round(value) })}
             min={0}
@@ -226,6 +231,7 @@ export function ControlPanel({
             <span className="text-[10px] text-zinc-500 font-mono tabular-nums bg-zinc-800 px-2 py-0.5">{settings.borderRadius}px</span>
           </div>
           <Slider
+            key={`border-radius-${settings.borderRadius}`}
             value={[settings.borderRadius]}
             onValueChange={([value]) => onSettingsChange({ borderRadius: Math.round(value) })}
             min={0}
@@ -246,7 +252,7 @@ export function ControlPanel({
           <SectionLabel>Backgrounds</SectionLabel>
           <ChevronIcon className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400" open={showBackgrounds} />
         </button>
-        
+
         {showBackgrounds && (
           <div className="space-y-2 animate-in slide-in-from-top-2 duration-150">
             {/* Solid Black option */}
@@ -309,7 +315,7 @@ export function ControlPanel({
       {/* Saved Presets */}
       <div className="space-y-3">
         <SectionLabel>Presets</SectionLabel>
-        
+
         {presets.length > 0 && (
           <div className="space-y-px bg-zinc-800 p-px mb-2">
             {presets.map((preset) => (
@@ -330,7 +336,7 @@ export function ControlPanel({
             ))}
           </div>
         )}
-        
+
         {showSaveInput ? (
           <div className="flex gap-px bg-zinc-800 p-px">
             <Input
@@ -364,6 +370,7 @@ export function ControlPanel({
       <Divider />
 
       {/* Export Actions */}
+      {hasImage && (
       <div className="space-y-2 pt-2">
         <button
           className="w-full py-3 px-4 bg-zinc-200 text-zinc-900 font-mono text-xs uppercase tracking-wider transition-all duration-100 hover:bg-zinc-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
@@ -379,7 +386,7 @@ export function ControlPanel({
             </>
           )}
         </button>
-        
+
         <button
           className="w-full py-2.5 px-4 border border-zinc-800 bg-zinc-900 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 transition-all duration-100 font-mono text-[11px] uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           onClick={onSaveToLibrary}
@@ -395,7 +402,8 @@ export function ControlPanel({
           )}
         </button>
       </div>
-      
+      )}
+
       {/* Bottom decoration */}
       <div className="flex items-center gap-2 pt-4">
         <div className="w-2 h-2 border border-zinc-800" />

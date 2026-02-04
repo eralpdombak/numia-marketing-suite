@@ -21,8 +21,8 @@ const defaultSettings: MockupSettings = {
   backgroundColor: bg1,
   borderRadius: 16,
   imageRadius: 0,
-  imageScale: 80,
-  browserScale: 80,
+  imageScale: 100,
+  browserScale: 100,
   shadow: true,
   deviceColor: 'black',
   brandingPosition: 'top-left',
@@ -305,9 +305,9 @@ export function MockupEditor() {
         />
       )}
 
-      <div className="h-[calc(100vh-56px)] flex">
+      <div className="h-[calc(100vh-56px)] flex overflow-hidden">
         {/* Canvas Area */}
-        <div className="flex-1 p-8 md:p-12 flex flex-col justify-center items-center bg-background">
+        <div className="flex-1 p-4 md:p-8 lg:p-12 flex flex-col justify-center items-center bg-background min-w-0">
           <div className="w-full max-w-4xl">
             <MockupCanvas
               ref={canvasRef}
@@ -330,8 +330,8 @@ export function MockupEditor() {
         </div>
 
         {/* Control Panel */}
-        <div className="w-72 border-l border-zinc-800 bg-zinc-900/50">
-          <div className="h-full overflow-y-auto p-5">
+        <div className="w-56 md:w-64 xl:w-72 border-l border-zinc-800 bg-zinc-900/50 flex-shrink-0">
+          <div className="h-full overflow-y-auto overflow-x-hidden pl-3 md:pl-4 xl:pl-5 pr-3 md:pr-4 xl:pr-5 py-3 md:py-4 xl:py-5">
             <ControlPanel
               settings={settings}
               onSettingsChange={handleSettingsChange}
@@ -343,6 +343,7 @@ export function MockupEditor() {
               onDeletePreset={handleDeletePreset}
               onSaveToLibrary={handleSaveToLibrary}
               isSavingToLibrary={isSavingToLibrary}
+              hasImage={!!image}
             />
           </div>
         </div>

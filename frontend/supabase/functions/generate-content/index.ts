@@ -5,6 +5,62 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Retry helper with exponential backoff
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries = 3,
+  timeoutMs = 60000
+): Promise<Response> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      // Create AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      // Don't retry on client errors (4xx except 429)
+      if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+        return response;
+      }
+
+      // Retry on 429 (rate limit) or 5xx errors
+      if (response.status === 429 || response.status >= 500) {
+        throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+      }
+
+      return response;
+    } catch (error) {
+      lastError = error as Error;
+
+      // Don't retry on abort (timeout)
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new Error(`Request timeout after ${timeoutMs}ms`);
+      }
+
+      // Don't retry on last attempt
+      if (attempt === maxRetries) {
+        break;
+      }
+
+      // Exponential backoff: 1s, 2s, 4s
+      const backoffMs = Math.pow(2, attempt) * 1000;
+      console.log(`Attempt ${attempt + 1} failed, retrying in ${backoffMs}ms...`);
+      await new Promise(resolve => setTimeout(resolve, backoffMs));
+    }
+  }
+
+  throw new Error(`Failed after ${maxRetries + 1} attempts: ${lastError?.message || "Unknown error"}`);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -15,7 +71,17 @@ serve(async (req) => {
     const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 
     if (!ANTHROPIC_API_KEY) {
-      throw new Error("ANTHROPIC_API_KEY is not configured");
+      return new Response(
+        JSON.stringify({ error: "API key not configured. Please contact support." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!prompt || !platform) {
+      return new Response(
+        JSON.stringify({ error: "Missing required fields: prompt and platform" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const systemPrompts: Record<string, string> = {
@@ -856,14 +922,362 @@ What's your current setup? Alchemy + QuickNode + prayer?
 
 That's it. Nothing before it. Nothing after it. Just the thread text.`,
 
-      blog: `You are a professional blog writer. Create well-structured blog posts that:
-- Have a compelling headline
-- Include an engaging introduction
-- Use headers and subheaders for organization
-- Include relevant examples and insights
-- Have a clear conclusion
-- Are optimized for readability
-- Use markdown formatting`,
+      blog: `# ⚠️ CRITICAL OUTPUT FORMAT RULE - READ THIS FIRST ⚠️
+
+YOU ARE STRICTLY FORBIDDEN FROM INCLUDING ANY META-COMMENTARY OR FORMATTING ISSUES.
+
+YOUR FIRST WORD MUST BE THE TITLE OF THE BLOG POST.
+
+❌ NEVER EVER START WITH:
+- "Here's" / "Here are" / "Here's a blog post"
+- "I'll" / "I've" / "Let me"
+- "Sure" / "Certainly" / "Of course"
+- "Title:" / "Headline:" / "Draft:"
+- "I need" / "Could you" / "What's"
+- ANY explanatory introduction
+- ANY questions asking for clarification
+
+❌ NEVER EVER ASK FOR MORE CONTEXT OR CLARIFICATION
+- Do NOT ask "What's the main message?"
+- Do NOT ask "Could you provide...?"
+- Do NOT ask for more details
+- JUST GENERATE THE CONTENT WITH WHAT YOU HAVE
+
+❌ NEVER EVER ADD ANALYSIS OR EXPLANATION AFTER THE CONTENT
+- Do NOT explain what you just wrote
+- Do NOT add "Why this works:", "SEO notes:", etc.
+- Do NOT say "This post is X words..."
+- Do NOT add breakdowns or analysis
+- JUST WRITE THE CONTENT AND STOP
+
+✅ YOU MUST:
+- Start IMMEDIATELY with the blog title (as H1: # Title)
+- Use markdown formatting (headers, lists, code blocks)
+- Write EXACTLY what will be published
+- Output the complete blog post
+- GENERATE CONTENT even if the prompt is vague
+- INFER what makes sense and just create it
+- STOP after the conclusion - no meta-commentary
+
+EXAMPLE OF WHAT NOT TO DO:
+"Here's a blog post about your topic:
+
+# The Title
+
+Content..."
+
+EXAMPLE OF WHAT TO DO:
+"# The Title
+
+Content starts immediately..."
+
+IF YOU START WITH META-COMMENTARY, ASK QUESTIONS, OR ADD ANALYSIS AFTER, YOU HAVE FAILED.
+
+---
+
+# Blog Post Generator for Numia
+
+Transform ideas into engaging, human-sounding blog posts for Numia's technical audience.
+
+**Context:**
+- Company: Numia (Data Blockchain Cloud - enterprise tools for Web3 data infrastructure, analytics, and growth)
+- Target: Web3 developers, blockchain founders, data engineers, protocols
+- Tone: Peer-to-peer, technical but conversational, empathetic
+- Voice: Company "we" or general industry "you"
+
+---
+
+# ⚠️ VARIATION IS CRITICAL - EVERY BLOG MUST BE UNIQUE ⚠️
+
+Blog posts must vary in structure, tone, and approach. Sameness = AI-sounding content.
+
+**MANDATORY VARIATION:**
+
+1. **Article Structure Rotation** - Use different frameworks:
+   - How-to guide with step-by-step instructions
+   - Problem-analysis with solution breakdown
+   - Case study or story-driven narrative
+   - Technical deep-dive with code/data
+   - Opinion piece or contrarian take
+   - Comparison/analysis post
+   - List-based ("5 ways", "3 mistakes") but varied
+
+2. **Hook Variation** - Open differently every time:
+   - Bold claim or controversial statement
+   - Specific scenario or anecdote
+   - Surprising statistic or data point
+   - Provocative question
+   - Industry observation
+   - Pain point statement
+   - Never use the same opening formula twice
+
+3. **Tone & Voice Shifts** - Vary the energy:
+   - Sometimes: Technical and analytical
+   - Sometimes: Conversational and accessible
+   - Sometimes: Opinionated and provocative
+   - Sometimes: Educational and methodical
+   - Sometimes: Story-driven and personal
+
+---
+
+## CRITICAL: Sound Human, Not AI
+
+### AI Red Flags to AVOID
+
+❌ "In today's rapidly evolving landscape..."
+❌ "In the ever-growing/ever-evolving [industry] landscape"
+❌ "Moreover," "Furthermore," "Additionally" (overuse)
+❌ "In conclusion," "To sum up," "Finally"
+❌ "It's important to note that..."
+❌ "One should always..." (nobody talks like this)
+❌ Perfect grammar with zero rule-breaking
+❌ Every paragraph the same length
+❌ Over-explaining obvious points
+❌ Generic, safe language with no personality
+❌ Template-style writing with rigid structure
+
+### How to Sound Human
+
+✅ Break grammar rules: Start with "And," "But," "So"
+✅ Use fragments: Like this. See?
+✅ Vary sentence length: Long sentences that explore the full context followed by short punchy ones. Works every time.
+✅ Add conversational phrases: "Here's the thing," "Look," "Real talk"
+✅ Include contractions: don't, you're, it's, we've
+✅ Show emotion: frustration, excitement, empathy
+✅ Be specific: Not "many developers" but "talked to 3 teams this week who..."
+✅ Use "you" constantly: Make it conversational
+✅ Include opinions and bold statements
+✅ Tell stories and use metaphors
+
+### The Humanity Checklist
+
+☑ Would I actually say this to a developer friend?
+☑ Does this sound like ME (or our brand voice)?
+☑ Are there specific details AI couldn't make up?
+☑ Did I break at least 2-3 grammar rules?
+☑ Is there emotion (frustration, relief, humor)?
+☑ Would this be valuable even if Numia didn't exist?
+
+---
+
+## Blog Structure
+
+### The Hook (First 2 Sentences)
+
+Choose one type and make it compelling:
+
+**Scenario Hook:**
+"It's 2am. Your phone buzzes. The dashboard is down again. You're cycling through three different provider status pages trying to figure out which one failed this time."
+
+**Bold Claim Hook:**
+"Most blockchain developers are using the wrong infrastructure stack. Not because they're inexperienced, but because the market's been lying to them about what 'reliability' actually means."
+
+**Question Hook:**
+"How many times have you refreshed your dashboard this week because the numbers didn't look right? If it's more than once, your data provider is costing you more than their monthly fee."
+
+**Stat Hook:**
+"According to our analysis of 847 production dApps, the average team spends 11.3 hours per week debugging data provider issues. That's 589 hours per year. Per team."
+
+### Subheadings (Make Them Interesting)
+
+❌ Don't use: "Introduction," "Benefits," "Conclusion"
+
+✅ Do use:
+- Questions: "Why Does Every Provider Lag at the Worst Possible Time?"
+- Bold Claims: "Multi-Provider Setups Are Making Your Life Harder, Not Easier"
+- Scenarios: "The 3am Alert That Could've Been Prevented"
+- Contrarian: "Stop Optimizing Your RPC Calls (Do This Instead)"
+
+### Body Content Requirements
+
+- Include specific examples, numbers, mini-stories
+- Use real scenarios developers face
+- Every sentence must add value
+- No fluff or filler content
+- Active voice always
+- First-person pronouns when natural
+- Show, don't tell
+
+### Conclusion
+
+- Clear takeaway or call to action
+- One sentence summary of the bottom line
+- No "in conclusion" phrases
+- End strong, not generic
+
+**Length: 800-1500 words** (adjust based on topic complexity)
+
+---
+
+## Technical Content Guidelines
+
+When writing technical content:
+
+- **Code examples**: Use real, working code - not pseudocode
+- **Performance metrics**: Always include context (e.g., "2 second response time under 10k requests/min")
+- **Comparisons**: Be specific and fair (never trash competitors by name)
+- **API examples**: Show actual request/response
+
+### Good Technical Writing:
+
+\`\`\`
+Here's what the query looks like:
+
+GET /v1/balances?address=0x...&chain=ethereum
+
+You'll get back:
+{
+  "balance": "1.247 ETH",
+  "timestamp": 1634567890,
+  "block_height": 13241234
+}
+
+The timestamp tells you exactly when that balance was accurate. If it's older than 30 seconds, you know you're looking at stale data.
+\`\`\`
+
+### Bad Technical Writing:
+
+"Our API provides balance information with timestamp data for staleness detection across multiple chains."
+
+---
+
+## Voice and Tone Rules
+
+- Sound like a peer who's been there, NOT a vendor
+- Write like you're explaining to a smart friend over coffee
+- Be direct: speak to "you," not "developers" or "users"
+- Show, don't tell: "Your dashboard crashes at 2am" not "systems may experience downtime"
+- Cut corporate jargon ruthlessly
+- Take a stance - have opinions
+
+---
+
+## Blog Templates
+
+### Template: Technical Deep Dive
+
+# [Compelling Title]
+
+[Hook: Specific problem scenario]
+
+## The Real Problem
+
+[Why this issue exists - root cause]
+
+## What Most Teams Do (And Why It Doesn't Work)
+
+[Common approach + why it fails]
+[Specific example of failure]
+
+## A Better Approach
+
+[Your solution/philosophy]
+[How it's different]
+
+## How This Plays Out
+
+[Concrete example with numbers/specifics]
+[Before/after comparison]
+
+## Implementation Notes
+
+[Technical details for those who want them]
+[Code snippet or architecture diagram if relevant]
+
+## The Bottom Line
+
+[One sentence summary]
+[Clear next step or CTA]
+
+### Template: Opinion/Perspective
+
+# [Bold/Provocative Title]
+
+[Hook: Controversial statement or surprising claim]
+
+## Here's Why Everyone Gets This Wrong
+
+[Common misconception]
+[Why it persists]
+
+## What Actually Happens
+
+[Reality vs. expectation]
+[Specific examples]
+
+## A Different Way to Think About It
+
+[Your perspective]
+[Supporting evidence/logic]
+
+## Why This Matters for Your Team
+
+[Practical implications]
+[Tangible benefits]
+
+## The Action Step
+
+[What to do differently]
+[How to start]
+
+---
+
+## Good vs Bad Examples
+
+### Introduction
+
+**❌ Bad:**
+"In today's rapidly evolving blockchain landscape, data infrastructure plays a critical role in enabling developers to build robust, scalable applications."
+
+**✅ Good:**
+"Here's what no one tells you about blockchain data providers: they're all fast enough to be frustrating. 30 seconds of lag isn't enough to timeout, but it's enough to make your users think your app is broken."
+
+---
+
+## Testing Your Blog Post
+
+Before finishing, verify:
+
+☐ Does the hook grab attention immediately?
+☐ Would someone who doesn't know Numia find this valuable?
+☐ Does it sound like I'm trying to sell something? (Should be NO)
+☐ Are subheadings interesting, not generic?
+☐ Did I include specific examples and numbers?
+☐ Did I break grammar rules naturally?
+☐ Is there personality and emotion?
+☐ Would I actually say this to a colleague?
+☐ Is every sentence adding value?
+☐ Did I vary sentence length?
+☐ Did I avoid AI clichés?
+
+---
+
+**Remember:** Use markdown formatting (headers, lists, bold, code blocks, etc.). Blog posts should be well-formatted and scannable.
+
+**The core philosophy:** Make them feel seen, give them value, show expertise through specific insights. If you mention Numia, do it naturally - focus on the problem and solution, not the product.
+
+---
+
+# FINAL REMINDER - OUTPUT FORMAT
+
+START YOUR RESPONSE IMMEDIATELY WITH THE BLOG TITLE AS H1.
+
+Do NOT write:
+- "Here's a blog post about..."
+- "Title:" or "Headline:"
+- ANY introduction or meta-commentary
+
+Just write the blog post. Start with: # Title
+
+Example of what you should output:
+
+# Why Your Data Provider is Lying to You (And You'll Never Know)
+
+Here's what no one tells you about blockchain data providers: they're all fast enough to be frustrating...
+
+[Rest of blog content]
+
+That's it. Nothing before it. Nothing after it. Just the blog post with markdown formatting.`,
 
       newsletter: `You are a newsletter content writer. Create engaging newsletter content that:
 - Has a catchy subject line suggestion
@@ -877,21 +1291,24 @@ That's it. Nothing before it. Nothing after it. Just the thread text.`,
 
     const systemPrompt = systemPrompts[platform] || systemPrompts.linkedin;
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages: [
-          {
-            role: "user",
-            content: `⚠️ CRITICAL INSTRUCTIONS - YOUR FIRST CHARACTER MUST BE THE POST CONTENT ⚠️
+    const response = await fetchWithRetry(
+      "https://api.anthropic.com/v1/messages",
+      {
+        method: "POST",
+        headers: {
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 4096,
+          temperature: 1,
+          system: systemPrompt,
+          messages: [
+            {
+              role: "user",
+              content: `⚠️ CRITICAL INSTRUCTIONS - YOUR FIRST CHARACTER MUST BE THE POST CONTENT ⚠️
 
 FORBIDDEN - DO NOT INCLUDE:
 ❌ "Here's" / "Here are" / "I'll" / "I've" / "Let me" / "Sure" / "Certainly"
@@ -920,37 +1337,53 @@ ${prompt}
 START YOUR RESPONSE NOW WITH THE POST CONTENT. NO INTRODUCTION. NO EXPLANATION. NO QUESTIONS. JUST THE POST.
 
 WHEN THE CONTENT IS DONE, STOP WRITING. DO NOT ADD ANYTHING AFTER THE CONTENT ENDS.`
-          },
-        ],
-        stream: true,
-      }),
-    });
+            },
+          ],
+          stream: true,
+        }),
+      },
+      3,
+      60000
+    );
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Anthropic API error:", response.status, errorText);
-      return new Response(JSON.stringify({ error: `Failed to generate content: ${response.status}` }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      let errorMessage = `Failed to generate content (HTTP ${response.status})`;
+      try {
+        const errorText = await response.text();
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error?.message || errorMessage;
+      } catch (e) {
+        // Use default error message if parsing fails
+      }
+      console.error("Anthropic API error:", response.status, errorMessage);
+      return new Response(
+        JSON.stringify({ error: errorMessage }),
+        { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Transform Anthropic's SSE format to OpenAI-compatible format for frontend
     const reader = response.body?.getReader();
     if (!reader) {
-      throw new Error("No response body");
+      return new Response(
+        JSON.stringify({ error: "No response body from API" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const stream = new ReadableStream({
       async start(controller) {
         const decoder = new TextDecoder();
         let buffer = "";
+        let hasError = false;
 
         try {
           while (true) {
             const { done, value } = await reader.read();
             if (done) {
-              controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+              if (!hasError) {
+                controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+              }
               controller.close();
               break;
             }
@@ -967,6 +1400,20 @@ WHEN THE CONTENT IS DONE, STOP WRITING. DO NOT ADD ANYTHING AFTER THE CONTENT EN
                 try {
                   const parsed = JSON.parse(data);
 
+                  // Check for error in stream
+                  if (parsed.type === "error" || parsed.error) {
+                    hasError = true;
+                    const errorMsg = parsed.error?.message || "Stream error occurred";
+                    console.error("Stream error:", errorMsg);
+                    controller.enqueue(
+                      new TextEncoder().encode(
+                        `data: ${JSON.stringify({ error: errorMsg })}\n\n`
+                      )
+                    );
+                    controller.close();
+                    return;
+                  }
+
                   // Anthropic format: { type: "content_block_delta", delta: { text: "..." } }
                   if (parsed.type === "content_block_delta" && parsed.delta?.text) {
                     // Convert to OpenAI-compatible format for frontend
@@ -982,15 +1429,22 @@ WHEN THE CONTENT IS DONE, STOP WRITING. DO NOT ADD ANYTHING AFTER THE CONTENT EN
                     );
                   }
                 } catch (e) {
-                  // Skip invalid JSON
-                  console.error("Failed to parse SSE data:", e);
+                  console.error("Failed to parse SSE data:", e, "Line:", line);
+                  // Don't fail the entire stream for one bad line
                 }
               }
             }
           }
         } catch (error) {
           console.error("Stream error:", error);
-          controller.error(error);
+          const errorMsg = error instanceof Error ? error.message : "Stream processing error";
+          // Send error through stream
+          controller.enqueue(
+            new TextEncoder().encode(
+              `data: ${JSON.stringify({ error: errorMsg })}\n\n`
+            )
+          );
+          controller.close();
         }
       },
     });
@@ -1000,9 +1454,32 @@ WHEN THE CONTENT IS DONE, STOP WRITING. DO NOT ADD ANYTHING AFTER THE CONTENT EN
     });
   } catch (error) {
     console.error("Error in generate-content function:", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+
+    let errorMessage = "An unexpected error occurred while generating content";
+    let statusCode = 500;
+
+    if (error instanceof Error) {
+      errorMessage = error.message;
+
+      // Provide more helpful error messages based on error type
+      if (error.message.includes("timeout")) {
+        errorMessage = "Request timed out. The API is taking too long to respond. Please try again.";
+        statusCode = 504;
+      } else if (error.message.includes("Failed after")) {
+        errorMessage = "Service temporarily unavailable after multiple retries. Please try again in a moment.";
+        statusCode = 503;
+      } else if (error.message.includes("API key")) {
+        errorMessage = "API authentication failed. Please contact support.";
+        statusCode = 500;
+      }
+    }
+
+    return new Response(
+      JSON.stringify({ error: errorMessage }),
+      {
+        status: statusCode,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   }
 });

@@ -257,9 +257,10 @@ export default function Library() {
   const [composeText, setComposeText] = useState<DbLibraryItem | null>(null);
   const [composeImage, setComposeImage] = useState<LocalLibraryItem | null>(null);
   const [isExporting, setIsExporting] = useState(false);
-  const [composeStep, setComposeStep] = useState<'text' | 'image'>('text');
+  const [composeStep, setComposeStep] = useState<'text' | 'image' | 'success'>('text');
   const [composeTextSearch, setComposeTextSearch] = useState('');
   const [composeImageSearch, setComposeImageSearch] = useState('');
+  const [typefullyUrl, setTypefullyUrl] = useState<string | null>(null);
 
   useEffect(() => {
     loadLibraryItems();
@@ -356,6 +357,20 @@ export default function Library() {
       }
 
       if (IS_LOCAL_MODE) {
+        // Check if local API server is running
+        try {
+          const healthCheck = await fetch('http://localhost:3001/health', { signal: AbortSignal.timeout(2000) });
+          if (!healthCheck.ok) {
+            throw new Error('Server not responding');
+          }
+        } catch (healthError) {
+          console.error('[Library] Local server not running:', healthError);
+          toast.error("Local server not running. Start it with: node server.js");
+          setTextItems([]);
+          setLoading(false);
+          return;
+        }
+
         // Load from local API server
         const apiData = await localApi.getAll();
         console.log('[Library] Loaded from local API:', apiData.length, 'items');
@@ -398,7 +413,7 @@ export default function Library() {
       }
     } catch (e) {
       console.error("Failed to load library:", e);
-      toast.error("Failed to load library");
+      toast.error(`Failed to load library: ${e instanceof Error ? e.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -693,7 +708,25 @@ export default function Library() {
       }
 
       const result = await response.json();
-      toast.success(result.message || "Draft created in Typefully!");
+
+      // Show success message with link
+      if (result.private_url) {
+        toast.success(
+          <div className="flex flex-col gap-2">
+            <span>{result.message || "Draft created in Typefully!"}</span>
+            <a
+              href={result.private_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 underline font-mono text-xs"
+            >
+              Open draft in Typefully →
+            </a>
+          </div>
+        );
+      } else {
+        toast.success(result.message || "Draft created in Typefully!");
+      }
       console.log("[Library] Draft created:", result);
     } catch (error) {
       console.error("[Library] Export error:", error);
@@ -735,13 +768,12 @@ export default function Library() {
       }
 
       const result = await response.json();
-      toast.success(result.message || "Draft created in Typefully!");
       console.log("[Library] Composed draft created:", result);
+      console.log("[Library] Typefully URL:", result.private_url);
 
-      // Close modal and reset
-      setShowCompose(false);
-      setComposeText(null);
-      setComposeImage(null);
+      // Store URL and show success step
+      setTypefullyUrl(result.private_url || null);
+      setComposeStep('success');
     } catch (error) {
       console.error("[Library] Compose export error:", error);
       toast.error(error instanceof Error ? error.message : "Failed to export to Typefully");
@@ -1139,6 +1171,7 @@ export default function Library() {
           setComposeStep('text');
           setComposeTextSearch('');
           setComposeImageSearch('');
+          setTypefullyUrl(null);
         }
       }}>
         <DialogContent className="max-w-3xl w-full max-h-[90vh] bg-zinc-950 border border-zinc-900 p-0 overflow-hidden flex flex-col">
@@ -1147,16 +1180,49 @@ export default function Library() {
           {/* Fixed Header */}
           <div className="p-8 pb-4 border-b border-zinc-900">
             <h2 className="font-mono text-sm uppercase tracking-wider text-zinc-300 mb-2">
-              {composeStep === 'text' ? 'Step 1: Select Text' : 'Step 2: Select Image'}
+              {composeStep === 'text' ? 'Step 1: Select Text' : composeStep === 'image' ? 'Step 2: Select Image' : 'Draft Created'}
             </h2>
             <p className="font-mono text-[11px] text-zinc-600">
-              {composeStep === 'text' ? 'Choose a text post from your library' : 'Choose an image from your library'}
+              {composeStep === 'text' ? 'Choose a text post from your library' : composeStep === 'image' ? 'Choose an image from your library' : 'Your draft is ready in Typefully'}
             </p>
           </div>
 
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto p-8 pt-6">
-            {composeStep === 'text' ? (
+            {composeStep === 'success' ? (
+              <div className="flex flex-col items-center justify-center py-12 space-y-6">
+                <CheckIcon className="w-12 h-12 text-green-500" />
+
+                <div className="text-center space-y-2">
+                  <p className="font-mono text-sm text-zinc-300 uppercase tracking-wider">
+                    Draft Created Successfully
+                  </p>
+                  <p className="font-mono text-xs text-zinc-500">
+                    Your post is now available in Typefully
+                  </p>
+                </div>
+
+                <div className="w-full max-w-md space-y-3">
+                  <p className="font-mono text-[11px] text-zinc-600 uppercase tracking-wider text-center">
+                    Here's your draft:
+                  </p>
+                  {typefullyUrl ? (
+                    <a
+                      href={typefullyUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-full px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-mono text-xs uppercase tracking-wider text-center transition-colors duration-300 ease-out"
+                    >
+                      Open in Typefully →
+                    </a>
+                  ) : (
+                    <div className="block w-full px-6 py-3 bg-zinc-800 text-zinc-500 font-mono text-xs uppercase tracking-wider text-center">
+                      URL not available (check console)
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : composeStep === 'text' ? (
               <div>
                 {/* Search */}
                 <div className="mb-4">
@@ -1303,43 +1369,63 @@ export default function Library() {
 
           {/* Fixed Footer */}
           <div className="p-8 pt-4 border-t border-zinc-900 bg-zinc-950">
-            <div className="flex items-center justify-between">
-              <button
-                onClick={() => {
-                  if (composeStep === 'image') {
-                    setComposeStep('text');
-                  } else {
+            {composeStep === 'success' ? (
+              <div className="flex justify-center">
+                <button
+                  onClick={() => {
                     setShowCompose(false);
                     setComposeText(null);
                     setComposeImage(null);
                     setComposeStep('text');
                     setComposeTextSearch('');
                     setComposeImageSearch('');
-                  }
-                }}
-                className="font-mono text-xs uppercase tracking-wider text-zinc-600 hover:text-zinc-400 transition-colors duration-300 ease-out"
-              >
-                {composeStep === 'image' ? 'Back' : 'Cancel'}
-              </button>
+                    setTypefullyUrl(null);
+                  }}
+                  className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono text-xs uppercase tracking-wider transition-colors duration-300 ease-out"
+                >
+                  Close
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => {
+                    if (composeStep === 'image') {
+                      setComposeStep('text');
+                    } else {
+                      setShowCompose(false);
+                      setComposeText(null);
+                      setComposeImage(null);
+                      setComposeStep('text');
+                      setComposeTextSearch('');
+                      setComposeImageSearch('');
+                      setTypefullyUrl(null);
+                    }
+                  }}
+                  className="font-mono text-xs uppercase tracking-wider text-zinc-600 hover:text-zinc-400 transition-colors duration-300 ease-out"
+                >
+                  {composeStep === 'image' ? 'Back' : 'Cancel'}
+                </button>
 
-              {composeStep === 'text' ? (
-                <button
-                  onClick={() => setComposeStep('image')}
-                  disabled={!composeText}
-                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-mono text-xs uppercase tracking-wider transition-colors duration-300 ease-out disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              ) : (
-                <button
-                  onClick={handleComposeExport}
-                  disabled={(!composeText && !composeImage) || isExporting}
-                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-mono text-xs uppercase tracking-wider transition-colors duration-300 ease-out disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isExporting ? "Exporting..." : "Export to Typefully"}
-                </button>
-              )}
-            </div>
+                {composeStep === 'text' ? (
+                  <button
+                    onClick={() => setComposeStep('image')}
+                    disabled={!composeText}
+                    className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-mono text-xs uppercase tracking-wider transition-colors duration-300 ease-out disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleComposeExport}
+                    disabled={(!composeText && !composeImage) || isExporting}
+                    className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-mono text-xs uppercase tracking-wider transition-colors duration-300 ease-out disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isExporting ? "Exporting..." : "Export to Typefully"}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

@@ -7,20 +7,20 @@ const Slider = React.forwardRef<
   React.ElementRef<typeof SliderPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root>
 >(({ className, ...props }, ref) => (
-  <div className="space-y-0.5">
+  <div className="w-full">
     {/* Ruler marks above */}
-    <div className="flex items-end justify-between h-1.5">
+    <div className="flex items-end justify-between h-1.5 mb-0.5 pointer-events-none select-none">
       {[...Array(21)].map((_, i) => (
         <div
           key={i}
           className={cn(
-            "w-px",
+            "w-px pointer-events-none",
             i % 10 === 0 ? "h-1.5 bg-muted-foreground/50" : i % 5 === 0 ? "h-1 bg-muted-foreground/30" : "h-0.5 bg-muted-foreground/20"
           )}
         />
       ))}
     </div>
-    
+
     <SliderPrimitive.Root
       ref={ref}
       className={cn(

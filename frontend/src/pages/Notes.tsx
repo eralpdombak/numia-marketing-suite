@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { toast } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
@@ -123,131 +123,104 @@ function ArrowRightIcon({ className }: { className?: string }) {
   );
 }
 
-// Clean content by removing AI meta-commentary and markdown formatting
+// Aggressively clean content by removing ALL AI meta-commentary
 function cleanGeneratedContent(rawContent: string): string {
   let cleaned = rawContent.trim();
 
-  // AGGRESSIVE: Remove everything before the actual content starts
-  // Strip any leading meta-commentary sentences one by one until we hit real content
-  const metaPrefixes = [
-    // Acknowledgments and meta-discussion (KILL FIRST)
-    /^Got it[^.!?]*[.!?]\s*/i,
-    /^Okay[^.!?]*[.!?]\s*/i,
-    /^Alright[^.!?]*[.!?]\s*/i,
-    /^Perfect[^.!?]*[.!?]\s*/i,
-    /^Great[^.!?]*[.!?]\s*/i,
-    /^Understood[^.!?]*[.!?]\s*/i,
-    /^Now I have[^.!?]*[.!?]\s*/i,
-    /^Now I understand[^.!?]*[.!?]\s*/i,
-    // Questions asking for clarification (KILL THESE FIRST)
-    /^I need more context[^.!?]*[.!?]\s*/i,
-    /^I need additional[^.!?]*[.!?]\s*/i,
-    /^Could you provide[^.!?]*[.!?]\s*/i,
-    /^Could you[^.!?]*[.!?]\s*/i,
-    /^What's the[^.!?]*[.!?]\s*/i,
-    /^What is the[^.!?]*[.!?]\s*/i,
-    /^Give me[^.!?]*[.!?]\s*/i,
-    /^Can you[^.!?]*[.!?]\s*/i,
-    /^Would you[^.!?]*[.!?]\s*/i,
-    // Regular meta-commentary
-    /^I need permission[^.!?]*[.!?]\s*/i,
-    /^I need to[^.!?]*[.!?]\s*/i,
-    /^I want to[^.!?]*[.!?]\s*/i,
-    /^I should[^.!?]*[.!?]\s*/i,
-    /^I can deliver[^.!?]*[.!?]\s*/i,
-    /^I can provide[^.!?]*[.!?]\s*/i,
-    /^I can create[^.!?]*[.!?]\s*/i,
-    /^I can't[^.!?]*[.!?]\s*/i,
-    /^I cannot[^.!?]*[.!?]\s*/i,
-    /^However, I can[^.!?]*[.!?]\s*/i,
-    /^Let me craft[^.!?]*[.!?]\s*/i,
-    /^Let me create[^.!?]*[.!?]\s*/i,
-    /^Let me write[^.!?]*[.!?]\s*/i,
-    /^Let me deliver[^.!?]*[.!?]\s*/i,
-    /^Let me make[^.!?]*[.!?]\s*/i,
-    /^Let me[^.!?]*[.!?]\s*/i,
-    /^I'm going to[^.!?]*[.!?]\s*/i,
-    /^I'll make[^.!?]*[.!?]\s*/i,
-    /^I'll[^.!?]*[.!?]\s*/i,
-    /^I've[^.!?]*[.!?]\s*/i,
-    /^Sure,?[^.!?]*[.!?]\s*/i,
-    /^Certainly,?[^.!?]*[.!?]\s*/i,
-    /^Of course,?[^.!?]*[.!?]\s*/i,
-    /^Here's[^:]*:\s*/i,
-    /^Here are[^:]*:\s*/i,
-    /^Here is[^:]*:\s*/i,
-    /^This is[^:]*:\s*/i,
-    /^Below is[^:]*:\s*/i,
-    /^Option \d+:?\s*/i,
-    /^Post \d+:?\s*/i,
-    /^Thread \d+:?\s*/i,
-    /^Tweet \d+:?\s*/i,
-    /^Version \d+:?\s*/i,
-    /^Draft:?\s*/i,
+  // Remove leading meta paragraphs (entire paragraphs before actual content)
+  cleaned = cleaned.replace(/^(?:Got it|Okay|Alright|Perfect|Great|Understood)[!.]?[^]*?(?=\n\n[A-Z]|$)/i, '').trim();
+  cleaned = cleaned.replace(/^Now I (?:have|understand)[^]*?(?=\n\n[A-Z]|$)/i, '').trim();
+  cleaned = cleaned.replace(/^(?:I need more context|Could you provide|What's the|Give me|Can you|Would you)[^]*?(?=\n\n|$)/i, '').trim();
+
+  // NUCLEAR: Remove ALL leading meta-commentary sentences line by line
+  const leadingMetaPatterns = [
+    /^Done\.?\s*/i,
+    /^Here'?s?\s+(?:a|an|your|the)\s+.+?(?:post|thread|blog|article|email|newsletter|content).*?[:.]\s*/i,
+    /^I'?ve\s+(?:created|crafted|written|made).*?[:.]\s*/i,
+    /^I\s+(?:need|want|should|can|cannot|can't|could)\s+.*?[:.]\s*/i,
+    /^However,?\s+I\s+can.*?[:.]\s*/i,
+    /^Let\s+me\s+(?:craft|create|write|deliver|make|provide).*?[:.]\s*/i,
+    /^I'm\s+going\s+to.*?[:.]\s*/i,
+    /^I'll.*?[:.]\s*/i,
+    /^Sure,?.*?[:.]\s*/i,
+    /^Certainly,?.*?[:.]\s*/i,
+    /^Of\s+course,?.*?[:.]\s*/i,
+    /^This\s+is.*?[:.]\s*/i,
+    /^Below\s+is.*?[:.]\s*/i,
+    /^Based\s+on.*?[:.]\s*/i,
+    /^(?:Post|Thread|Tweet|Email|Blog\s+Post|Newsletter|Article)\s+\d+.*?[:.]\s*/i,
+    /^(?:LinkedIn|Twitter|X|Blog)\s+(?:Post|Thread).*?[:.]\s*/i,
+    /^Title:.*$/im,
+    /^Topic:.*$/im,
+    /^Thread\s+Length:.*$/im,
     /^🧵.*$/im,
   ];
 
-  // NUCLEAR OPTION: Strip ENTIRE paragraphs of meta-commentary
-  // This catches multi-sentence AI blabber before the actual content
-  const metaParagraphs = [
-    /^(?:Got it|Okay|Alright|Perfect|Great|Understood)[!.]?[^]*?(?=\n\n[A-Z]|$)/i,
-    /^Now I (?:have|understand)[^]*?(?=\n\n[A-Z]|$)/i,
-    /^(?:I need more context|Could you provide|What's the|Give me|Can you|Would you)[^]*?(?=\n\n|$)/i,
-  ];
-
-  metaParagraphs.forEach(pattern => {
-    cleaned = cleaned.replace(pattern, '').trim();
-  });
-
-  // If there are numbered lists of questions, nuke them
-  cleaned = cleaned.replace(/^\d+\.\s+What[^]*?(?=\n\n[A-Z]|$)/i, '').trim();
-
-  // Keep stripping until nothing matches (max 20 iterations for safety)
-  let iterations = 0;
-  let previousContent = '';
-  while (cleaned !== previousContent && iterations < 20) {
-    previousContent = cleaned;
-    for (const pattern of metaPrefixes) {
+  // Apply ALL leading meta patterns multiple times
+  for (let iteration = 0; iteration < 5; iteration++) {
+    const before = cleaned;
+    for (const pattern of leadingMetaPatterns) {
       cleaned = cleaned.replace(pattern, '').trim();
     }
-    iterations++;
+    if (before === cleaned) break; // Early exit if nothing changed
   }
 
-  // Remove separator lines
-  cleaned = cleaned.replace(/^---+\s*$/gm, '');
-  cleaned = cleaned.replace(/^===+\s*$/gm, '');
-  cleaned = cleaned.replace(/^___+\s*$/gm, '');
+  // Remove separators
+  cleaned = cleaned.replace(/^(?:---+|===+|___+)\s*$/gm, '');
 
-  // Remove ALL markdown formatting
-  cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, '$1'); // **bold**
-  cleaned = cleaned.replace(/\*([^*]+)\*/g, '$1');     // *italic*
-  cleaned = cleaned.replace(/__([^_]+)__/g, '$1');     // __bold__
-  cleaned = cleaned.replace(/_([^_]+)_/g, '$1');       // _italic_
-  cleaned = cleaned.replace(/^#{1,6}\s+/gm, '');       // # headers
+  // Remove markdown (but keep headers for blog posts)
+  cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, '$1')  // **bold**
+                   .replace(/__([^_]+)__/g, '$1')      // __bold__
+                   .replace(/\*([^*]+)\*/g, '$1')      // *italic*
+                   .replace(/_([^_]+)_/g, '$1')        // _italic_
+                   .replace(/```[\s\S]*?```/g, '')     // code blocks
+                   .replace(/`([^`]+)`/g, '$1');       // inline code
 
-  // Remove code blocks if any
-  cleaned = cleaned.replace(/```[\s\S]*?```/g, '');
-  cleaned = cleaned.replace(/`([^`]+)`/g, '$1');
-
-  // NUCLEAR: Remove trailing meta-analysis and commentary
-  // These patterns indicate the AI is explaining what it just wrote
+  // NUCLEAR: Remove ALL trailing meta-analysis (everything after the actual content)
   const trailingMetaPatterns = [
-    /\n\n(?:The Hook:|FOMO Elements:|Product Integration:|Humanized Writing:|Call to Action:|Analysis:|Breakdown:|Structure:|Key Elements:|Why this works:|The post is|Word count:|Notes?:|This follows?|This creates?)[^]*$/i,
-    /\n\nThis (?:post|thread|content|approach)[^]*$/i,
-    /\n\nI (?:used|included|incorporated|added|made|created|wrote|structured)[^]*$/i,
-    /\n\n\*\*[^*]+\*\*\s*$/,  // Trailing bold text (often used for analysis headers)
+    // Blog-specific meta-commentary (MUST BE FIRST - most specific)
+    /\n\n[!?]?\s*I'?ve\s+created\s+a\s+blog\s+post.*$/is,
+    /\n\nUnique\s+aspects?:.*$/is,
+    /\n\nHuman\s+touches?\s+(?:added|included)?:.*$/is,
+    /\n\nNo\s+Numia\s+pitch.*$/is,
+    /\n\nThe\s+focus\s+is.*$/is,
+    /\n\nLength:.*$/is,
+    /\n\n~?\d+[,\d]*\s+words?.*$/is,  // "~1,300 words"
+
+    // Analysis headers - catch ANY variation
+    /\n\n(?:What makes this work|Why this works|What works here|Why this lands|What I did|How this works|The strategy|The approach).*$/is,
+    /\n\n(?:Key\s+elements?\s+(?:I\s+)?(?:baked\s+in|used|included|added)).*$/is,
+    /\n\n(?:The\s+Hook|FOMO\s+Elements|Product\s+Integration|Humanized\s+Writing|Call\s+to\s+Action|Analysis|Breakdown|Structure|Key\s+Elements|Strategy|Approach):.*$/is,
+
+    // "This [thing]..." analysis
+    /\n\nThis\s+(?:post|thread|content|approach|blog|article|email|newsletter|strategy|should).*$/is,
+
+    // "I [verb]..." explanations
+    /\n\nI\s+(?:used|included|incorporated|added|baked\s+in|made|created|wrote|structured|designed|crafted|'ve\s+created).*$/is,
+
+    // "The tone is..." analysis
+    /\n\nThe\s+(?:tone|voice|style|approach|structure|blog|article|post)\s+(?:is|uses|focuses).*$/is,
+
+    // Metadata
+    /\n\nWord\s+count:.*$/is,
+    /\n\nCharacter\s+count:.*$/is,
+    /\n\nNote:.*$/is,
+
+    // Numbered lists of analysis (like the example user showed)
+    /\n\n-\s+(?:Structure|Hook|Tone|Length|Human\s+touches?|Opinion|Code\s+example|Sentence|Rule-breaking|Specific|Real\s+developer|Conversational):.*$/is,
+    /\n\n\d+\.\s+(?:Opens|Uses|Contrasts|Breaks|Quantifies|Ends|Shows|Creates|Builds|Focuses).*$/is,
+
+    // Trailing formatting
+    /\n\n\*\*.*?\*\*\s*$/,  // Trailing bold sections
     /\n\n---+\s*$/,  // Trailing separators
   ];
 
-  trailingMetaPatterns.forEach(pattern => {
+  for (const pattern of trailingMetaPatterns) {
     cleaned = cleaned.replace(pattern, '');
-  });
+  }
 
-  // Clean up extra blank lines (max 2 consecutive newlines)
-  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
-
-  // Final trim
-  cleaned = cleaned.trim();
+  // Clean up excessive newlines
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
 
   return cleaned;
 }
@@ -258,9 +231,16 @@ export default function Notes() {
   const [output, setOutput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [isSavingIntelligence, setIsSavingIntelligence] = useState(false);
+  const outputContainerRef = useRef<HTMLDivElement>(null);
 
   const currentCommand = commands.find(c => c.id === selectedCommand)!;
+
+  // Scroll to top when output changes during generation
+  useEffect(() => {
+    if (isGenerating && outputContainerRef.current) {
+      outputContainerRef.current.scrollTop = 0;
+    }
+  }, [output, isGenerating]);
 
   const handleGenerate = async () => {
     if (!input.trim()) {
@@ -271,27 +251,29 @@ export default function Notes() {
     setOutput("");
     setProgress(0);
 
-    // Simulated progress that moves smoothly while waiting for content
-    let simulatedProgress = 0;
+    // Reset scroll position at the start
+    if (outputContainerRef.current) {
+      outputContainerRef.current.scrollTop = 0;
+    }
+
+    // Simulated progress - moves very slowly and consistently
     const progressInterval = setInterval(() => {
-      simulatedProgress += 1;
-      // Logarithmic slowdown as we approach 90% to avoid going too far ahead
-      // Starts fast, then slows down smoothly
-      const increment = Math.max(0.5, (90 - simulatedProgress) / 20);
-      if (simulatedProgress < 90) {
-        setProgress(prev => Math.floor(Math.min(90, prev + increment)));
-      }
-    }, 300); // Update every 300ms
+      setProgress(prev => {
+        if (prev >= 85) return prev; // Stop at 85%, wait for real content
+        // Very slow, consistent increment - takes ~85 seconds to reach 85%
+        return Math.min(85, prev + 1);
+      });
+    }, 1000); // Update every 1 second for slow, steady progress
 
     try {
-      // Target word counts for progress calculation
+      // Target word counts for progress calculation (aligned with slash command guidelines)
       const targetWordCounts: Record<CommandType, number> = {
-        linkedin: 120,
-        twitter: 100,
-        thread: 200,
-        blog: 800,
-        email: 300,
-        newsletter: 500,
+        linkedin: 120,      // LinkedIn: 100-150 words (guideline says 100-120 ideal)
+        twitter: 30,        // Single tweet: ~25-35 words
+        thread: 150,        // Twitter thread: 7-9 tweets × ~20 words = 140-180 words
+        blog: 1500,         // Blog: 1200-2000 words (guideline says 1200-2000 ideal)
+        email: 250,         // Email: ~200-300 words
+        newsletter: 400,    // Newsletter: ~350-450 words
       };
       const targetWords = targetWordCounts[selectedCommand];
 
@@ -342,15 +324,23 @@ export default function Notes() {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Edge function error:", response.status, errorText);
-        throw new Error(`Failed to generate content: ${response.status}`);
+        let errorMessage = "Failed to generate content";
+        try {
+          const errorText = await response.text();
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          // Use default error message if parsing fails
+          errorMessage = `Failed to generate content (${response.status})`;
+        }
+        console.error("Edge function error:", response.status, errorMessage);
+        throw new Error(errorMessage);
       }
 
       // Handle streaming response
       const reader = response.body?.getReader();
       if (!reader) {
-        throw new Error("No response body");
+        throw new Error("No response body received from server");
       }
 
       const decoder = new TextDecoder();
@@ -371,6 +361,12 @@ export default function Notes() {
 
             try {
               const parsed = JSON.parse(data);
+
+              // Check for error in stream
+              if (parsed.error) {
+                throw new Error(parsed.error);
+              }
+
               const content = parsed.choices?.[0]?.delta?.content || "";
 
               if (content) {
@@ -386,34 +382,55 @@ export default function Notes() {
                 const cleanedContent = cleanGeneratedContent(accumulatedRawContent);
                 setOutput(cleanedContent);
 
-                // Calculate real progress based on word count of cleaned content
+                // Once content starts streaming, move from current position to 95%
                 const wordCount = cleanedContent.trim().split(/\s+/).filter(w => w.length > 0).length;
-                const calculatedProgress = Math.floor(Math.min(95, (wordCount / targetWords) * 100));
+                const wordProgress = Math.min(100, (wordCount / targetWords) * 100);
+                // Map word progress to 85-95% range
+                const calculatedProgress = Math.floor(85 + (wordProgress * 0.10));
                 // Only update if progress increases (never go backwards)
                 setProgress(prev => Math.max(prev, calculatedProgress));
               }
             } catch (e) {
-              // Skip invalid JSON
+              // If it's an error object, throw it
+              if (e instanceof Error) {
+                throw e;
+              }
+              // Otherwise skip invalid JSON
             }
           }
         }
       }
 
+      // Validate we received some content
+      if (!accumulatedRawContent.trim()) {
+        throw new Error("No content was generated. Please try again.");
+      }
+
       clearInterval(progressInterval);
 
-      // Final cleaning pass to ensure everything is clean
+      // Move to 95% → 98% → 100% smoothly during final processing
+      setProgress(95);
+      await new Promise(resolve => setTimeout(resolve, 150));
+
+      setProgress(98);
+
+      // Final cleaning pass
       const finalCleanedContent = cleanGeneratedContent(accumulatedRawContent);
       setOutput(finalCleanedContent);
 
-      // Ensure progress reaches 100% before hiding loader
+      await new Promise(resolve => setTimeout(resolve, 150));
+
+      // Show 100% completion
       setProgress(100);
 
-      // Small delay to ensure user sees 100% before loading state disappears
+      // Brief delay so user sees 100%
       await new Promise(resolve => setTimeout(resolve, 300));
     } catch (error) {
       clearInterval(progressInterval);
-      toast.error("Failed to generate content");
-      console.error(error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to generate content";
+      toast.error(errorMessage);
+      console.error("Generation error:", error);
+      setOutput(""); // Clear any partial output on error
     } finally {
       setIsGenerating(false);
     }
@@ -477,72 +494,6 @@ export default function Notes() {
     }
   };
 
-  const handleFeedTheBrain = async () => {
-    if (!output) {
-      toast.error("No content to save");
-      return;
-    }
-
-    setIsSavingIntelligence(true);
-    console.log('Starting to save intelligence...');
-
-    try {
-      const IS_LOCAL_MODE = import.meta.env.VITE_LOCAL_MODE === 'true';
-      console.log('Local mode:', IS_LOCAL_MODE);
-
-      if (!IS_LOCAL_MODE) {
-        toast.error("Intelligence only available in local mode");
-        setIsSavingIntelligence(false);
-        return;
-      }
-
-      const platformMap: Record<CommandType, string> = {
-        linkedin: "linkedin",
-        twitter: "twitter",
-        thread: "twitter",
-        blog: "blog",
-        email: "email",
-        newsletter: "newsletter",
-      };
-
-      const platform = platformMap[selectedCommand];
-      const localApiUrl = import.meta.env.VITE_LOCAL_API_URL || 'http://localhost:3001';
-
-      console.log('Sending request to:', `${localApiUrl}/api/save-output-intelligence`);
-      console.log('Platform:', platform);
-
-      const response = await fetch(`${localApiUrl}/api/save-output-intelligence`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          content: output,
-          platform: platform,
-          input: input,
-        }),
-      });
-
-      console.log('Response status:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('Error response:', errorData);
-        throw new Error(errorData.error || 'Failed to save intelligence');
-      }
-
-      const data = await response.json();
-      console.log('Saved output to:', data.outputFile);
-      console.log('Saved learnings to:', data.learningsFile);
-
-      toast.success("Saved to intelligence");
-    } catch (error) {
-      console.error("Failed to save intelligence:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to save intelligence");
-    } finally {
-      setIsSavingIntelligence(false);
-    }
-  };
 
   return (
     <div className="h-screen bg-zinc-950 overflow-hidden">
@@ -651,26 +602,12 @@ export default function Notes() {
                   Output
                 </span>
                 {output && (
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={handleFeedTheBrain}
-                      disabled={isSavingIntelligence}
-                      className={cn(
-                        "px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors",
-                        isSavingIntelligence
-                          ? "text-zinc-600 cursor-not-allowed"
-                          : "text-zinc-400 hover:text-zinc-200"
-                      )}
-                    >
-                      {isSavingIntelligence ? "Saving..." : "Save to Intelligence"}
-                    </button>
-                    <button
-                      onClick={handleSaveToLibrary}
-                      className="px-4 py-2 font-mono text-xs uppercase tracking-wider text-zinc-400 hover:text-zinc-200 transition-colors"
-                    >
-                      Save to Library
-                    </button>
-                  </div>
+                  <button
+                    onClick={handleSaveToLibrary}
+                    className="px-4 py-2 font-mono text-xs uppercase tracking-wider text-zinc-400 hover:text-zinc-200 transition-colors"
+                  >
+                    Save to Library
+                  </button>
                 )}
               </div>
 
@@ -691,7 +628,7 @@ export default function Notes() {
                     </div>
                   </div>
                 ) : output ? (
-                  <div className="h-[350px] overflow-y-auto">
+                  <div ref={outputContainerRef} className="h-[350px] overflow-y-auto">
                     <pre className="text-zinc-300 font-mono text-sm leading-relaxed whitespace-pre-wrap">
                       {output}
                     </pre>

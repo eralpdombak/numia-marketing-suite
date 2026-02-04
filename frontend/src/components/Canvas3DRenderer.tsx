@@ -79,24 +79,24 @@ export function Canvas3DRenderer({
         const bgImg = new Image();
         bgImg.crossOrigin = 'anonymous';
         bgImg.onload = () => {
-          // Use object-contain to fit background image within canvas
+          // Use object-cover to fill canvas completely (no black bars)
           const bgAspect = bgImg.width / bgImg.height;
           const canvasAspect = width / height;
 
           let bgWidth, bgHeight, bgX, bgY;
 
           if (bgAspect > canvasAspect) {
-            // Background is wider - fit to width
-            bgWidth = width;
-            bgHeight = width / bgAspect;
-            bgX = 0;
-            bgY = (height - bgHeight) / 2;
-          } else {
-            // Background is taller - fit to height
+            // Background is wider - fit to height and crop sides
             bgHeight = height;
             bgWidth = height * bgAspect;
             bgX = (width - bgWidth) / 2;
             bgY = 0;
+          } else {
+            // Background is taller - fit to width and crop top/bottom
+            bgWidth = width;
+            bgHeight = width / bgAspect;
+            bgX = 0;
+            bgY = (height - bgHeight) / 2;
           }
 
           ctx.drawImage(bgImg, bgX, bgY, bgWidth, bgHeight);
