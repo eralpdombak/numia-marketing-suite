@@ -56,7 +56,28 @@ export function MockupEditor() {
   }, [presets]);
 
   const handleSettingsChange = useCallback((newSettings: Partial<MockupSettings>) => {
-    setSettings(prev => ({ ...prev, ...newSettings }));
+    setSettings(prev => {
+      const updated = { ...prev, ...newSettings };
+
+      // Sync scales when switching device types to maintain visual size
+      if (newSettings.deviceType && newSettings.deviceType !== prev.deviceType) {
+        if (newSettings.deviceType === 'browser' && prev.deviceType === 'none') {
+          // Switching to browser: map imageScale (30-100) to browserScale (58-100)
+          // 30% imageScale -> 58% browserScale
+          // 100% imageScale -> 100% browserScale
+          const normalized = (prev.imageScale - 30) / 70; // 0 to 1
+          updated.browserScale = Math.round(58 + normalized * 42); // 58 to 100
+        } else if (newSettings.deviceType === 'none' && prev.deviceType === 'browser') {
+          // Switching to none: map browserScale (58-100) to imageScale (30-100)
+          // 58% browserScale -> 30% imageScale
+          // 100% browserScale -> 100% imageScale
+          const normalized = (prev.browserScale - 58) / 42; // 0 to 1
+          updated.imageScale = Math.round(30 + normalized * 70); // 30 to 100
+        }
+      }
+
+      return updated;
+    });
   }, []);
 
   const handleImageUpload = useCallback((uploadedImage: UploadedImage) => {
@@ -290,8 +311,8 @@ export function MockupEditor() {
 
   return (
     <div className="min-h-screen pt-14">
-      {/* Hidden canvas-based renderer for exports */}
-      {image && (
+      {/* Hidden canvas-based renderer for exports - disabled to prevent blocking UI */}
+      {/* {image && (
         <Canvas3DRenderer
           settings={settings}
           image={image}
@@ -303,7 +324,7 @@ export function MockupEditor() {
             exportCanvasRef.current = canvas;
           }}
         />
-      )}
+      )} */}
 
       <div className="h-[calc(100vh-56px)] flex overflow-hidden">
         {/* Canvas Area */}

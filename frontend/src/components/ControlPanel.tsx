@@ -8,9 +8,6 @@ import { Loader2 } from "lucide-react";
 
 import bg1 from "@/assets/backgrounds/bg-1.svg";
 import bg2 from "@/assets/backgrounds/bg-2.svg";
-import bg3 from "@/assets/backgrounds/bg-3.svg";
-import bg4 from "@/assets/backgrounds/bg-4.svg";
-import bg5 from "@/assets/backgrounds/bg-5.png";
 
 interface BackgroundPreset {
   id: string;
@@ -21,8 +18,6 @@ interface BackgroundPreset {
 const backgroundPresets: BackgroundPreset[] = [
   { id: "preset-1", name: "Gradient 1", image: bg1 },
   { id: "preset-2", name: "Gradient 2", image: bg2 },
-  { id: "preset-3", name: "Gradient 3", image: bg3 },
-  { id: "preset-5", name: "Frame 94", image: bg5 },
 ];
 
 interface ControlPanelProps {
@@ -179,7 +174,6 @@ export function ControlPanel({
             <span className="text-[10px] text-zinc-500 font-mono tabular-nums bg-zinc-800 px-2 py-0.5">{settings.imageScale}%</span>
           </div>
           <Slider
-            key={`size-${settings.imageScale}`}
             value={[settings.imageScale]}
             onValueChange={([value]) => onSettingsChange({ imageScale: Math.round(value) })}
             min={30}
@@ -196,7 +190,6 @@ export function ControlPanel({
             <span className="text-[10px] text-zinc-500 font-mono tabular-nums bg-zinc-800 px-2 py-0.5">{Math.round(((settings.browserScale - 58) / 42) * 100)}%</span>
           </div>
           <Slider
-            key={`browser-size-${settings.browserScale}`}
             value={[settings.browserScale]}
             onValueChange={([value]) => onSettingsChange({ browserScale: Math.round(value) })}
             min={58}
@@ -214,7 +207,6 @@ export function ControlPanel({
             <span className="text-[10px] text-zinc-500 font-mono tabular-nums bg-zinc-800 px-2 py-0.5">{settings.imageRadius}px</span>
           </div>
           <Slider
-            key={`radius-${settings.imageRadius}`}
             value={[settings.imageRadius]}
             onValueChange={([value]) => onSettingsChange({ imageRadius: Math.round(value) })}
             min={0}
@@ -231,7 +223,6 @@ export function ControlPanel({
             <span className="text-[10px] text-zinc-500 font-mono tabular-nums bg-zinc-800 px-2 py-0.5">{settings.borderRadius}px</span>
           </div>
           <Slider
-            key={`border-radius-${settings.borderRadius}`}
             value={[settings.borderRadius]}
             onValueChange={([value]) => onSettingsChange({ borderRadius: Math.round(value) })}
             min={0}

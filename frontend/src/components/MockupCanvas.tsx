@@ -81,97 +81,34 @@ export const MockupCanvas = forwardRef<HTMLElement, MockupCanvasProps>(
         }
       : { backgroundColor: settings.backgroundColor };
 
-    // None mode
-    if (settings.deviceType === 'none') {
-      return (
-        <label
-          ref={ref as React.Ref<HTMLLabelElement>}
-          data-capture="true"
-          className={cn(
-            "relative aspect-[16/10] w-full flex items-center justify-center p-8 group overflow-visible",
-            !image && "cursor-pointer",
-            isDragging && "ring-1 ring-foreground/20",
-            className
-          )}
-          style={{ 
-            borderRadius: settings.borderRadius, 
-            ...backgroundStyle,
-          }}
-          onDragEnter={!image ? handleDragIn : undefined}
-          onDragLeave={!image ? handleDragOut : undefined}
-          onDragOver={!image ? handleDrag : undefined}
-          onDrop={!image ? handleDrop : undefined}
-        >
-          {/* Branding */}
-          {settings.brandingPosition !== 'none' && (
-            <span className={cn(
-              "absolute font-poppins font-bold text-foreground/90 text-base z-10 tracking-tight",
-              settings.brandingPosition === 'top-left' && "top-3 left-4",
-              settings.brandingPosition === 'top-right' && "top-3 right-4",
-              settings.brandingPosition === 'bottom-left' && "bottom-3 left-4",
-              settings.brandingPosition === 'bottom-right' && "bottom-3 right-4"
-            )}>
-              NUMIA
-            </span>
-          )}
-          {!image && (
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileInput}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            />
-          )}
-          {image ? (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <img
-                src={image.src}
-                alt={image.name}
-                className={cn(
-                  "max-w-full max-h-full object-contain",
-                  settings.shadow && "device-shadow"
-                )}
-                style={{
-                  borderRadius: settings.imageRadius,
-                  transform: `scale(${settings.imageScale / 100})`,
-                  opacity: 1,
-                }}
-              />
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center gap-3">
-              <div className="w-12 h-12 border border-zinc-500 flex items-center justify-center">
-                <Upload className="w-5 h-5 text-zinc-400" />
-              </div>
-              <p className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">
-                {isDragging ? "Release to upload" : "Drop image or click"}
-              </p>
-            </div>
-          )}
-        </label>
-      );
-    }
-
-    // Browser mode
+    // Single label element - no conditional rendering to prevent remounting
     return (
       <label
         ref={ref as React.Ref<HTMLLabelElement>}
         data-capture="true"
         className={cn(
-          "relative aspect-[16/10] w-full overflow-visible flex items-center justify-center group transition-all duration-300",
+          "relative aspect-[16/10] w-full overflow-visible flex items-center justify-center group",
+          settings.deviceType === 'none' && "p-8",
           !image && "cursor-pointer",
           isDragging && "ring-1 ring-foreground/20",
           className
         )}
         style={{
           borderRadius: settings.borderRadius,
-          ...backgroundStyle,
         }}
         onDragEnter={!image ? handleDragIn : undefined}
         onDragLeave={!image ? handleDragOut : undefined}
         onDragOver={!image ? handleDrag : undefined}
         onDrop={!image ? handleDrop : undefined}
       >
+        {/* Persistent background layer - never unmounts */}
+        <div
+          className="absolute inset-0 transition-all duration-200 ease-out pointer-events-none"
+          style={{
+            borderRadius: settings.borderRadius,
+            ...backgroundStyle,
+          }}
+        />
         {/* Branding */}
         {settings.brandingPosition !== 'none' && (
           <span className={cn(
@@ -192,29 +129,28 @@ export const MockupCanvas = forwardRef<HTMLElement, MockupCanvasProps>(
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           />
         )}
-        {/* Browser frame wrapper */}
-        <div
-          className="flex items-center justify-center w-full p-8"
-          style={{
-            maxWidth: `${settings.browserScale}%`,
-          }}
-        >
-          <DeviceFrame
-            deviceType={settings.deviceType}
-            deviceColor={settings.deviceColor}
-            className={cn(
-              settings.shadow && "device-shadow"
-            )}
-          >
+
+        {/* None mode - direct image */}
+        {settings.deviceType === 'none' && (
+          <>
             {image ? (
-              <img
-                src={image.src}
-                alt={image.name}
-                className="w-full h-full object-cover"
-                style={{ opacity: 1 }}
-              />
+              <div className="absolute inset-0 flex items-center justify-center z-[1]">
+                <img
+                  src={image.src}
+                  alt={image.name}
+                  className={cn(
+                    "max-w-full max-h-full object-contain transition-transform duration-200 ease-out",
+                    settings.shadow && "device-shadow"
+                  )}
+                  style={{
+                    borderRadius: settings.imageRadius,
+                    transform: `scale(${settings.imageScale / 100})`,
+                    opacity: 1,
+                  }}
+                />
+              </div>
             ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+              <div className="flex flex-col items-center justify-center gap-3 relative z-[1]">
                 <div className="w-12 h-12 border border-zinc-500 flex items-center justify-center">
                   <Upload className="w-5 h-5 text-zinc-400" />
                 </div>
@@ -223,8 +159,44 @@ export const MockupCanvas = forwardRef<HTMLElement, MockupCanvasProps>(
                 </p>
               </div>
             )}
-          </DeviceFrame>
-        </div>
+          </>
+        )}
+
+        {/* Browser mode - image in frame */}
+        {settings.deviceType === 'browser' && (
+          <div
+            className="flex items-center justify-center w-full p-8 transition-all duration-200 ease-out relative z-[1]"
+            style={{
+              maxWidth: `${settings.browserScale}%`,
+            }}
+          >
+            <DeviceFrame
+              deviceType={settings.deviceType}
+              deviceColor={settings.deviceColor}
+              className={cn(
+                settings.shadow && "device-shadow"
+              )}
+            >
+              {image ? (
+                <img
+                  src={image.src}
+                  alt={image.name}
+                  className="w-full h-full object-cover"
+                  style={{ opacity: 1 }}
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                  <div className="w-12 h-12 border border-zinc-500 flex items-center justify-center">
+                    <Upload className="w-5 h-5 text-zinc-400" />
+                  </div>
+                  <p className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">
+                    {isDragging ? "Release to upload" : "Drop image or click"}
+                  </p>
+                </div>
+              )}
+            </DeviceFrame>
+          </div>
+        )}
       </label>
     );
   }
