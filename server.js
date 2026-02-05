@@ -240,6 +240,310 @@ app.get('/api/changelog', async (req, res) => {
 });
 
 /**
+ * Generate blog content using Anthropic API directly
+ * Bypasses slash command system which was causing meta-commentary issues
+ */
+async function generateBlogWithAnthropicAPI(req, res, userPrompt) {
+  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+
+  if (!ANTHROPIC_API_KEY) {
+    return res.status(500).json({ error: 'API key not configured' });
+  }
+
+  // Ultra-strict system prompt that forces Claude to start with # immediately
+  const systemPrompt = `YOU ARE A BLOG POST GENERATOR. OUTPUT ONLY THE BLOG POST.
+
+YOUR FIRST CHARACTER MUST BE: #
+
+FORBIDDEN - NEVER WRITE:
+- "Here's a blog post"
+- "I've created"
+- "**Title:**"
+- "What makes this work"
+- "Key elements"
+- "Structure:"
+- "This blog post"
+- ANY analysis
+- ANY explanation
+- ANY meta-commentary
+
+REQUIRED:
+- Start IMMEDIATELY with: # [Blog Headline]
+- Write ONLY the blog post content
+- End immediately when post ends
+- ZERO commentary before or after
+
+Write a comprehensive blog post (1200-2000 words) for Numia (Data Blockchain Cloud).
+Target: Web3 developers, blockchain founders, data engineers.
+Tone: Technical but conversational.
+
+OUTPUT ONLY THE BLOG POST. START WITH # NOW.`;
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  try {
+    const stream = await anthropic.messages.stream({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4096,
+      temperature: 1,
+      system: systemPrompt,
+      messages: [{
+        role: 'user',
+        content: userPrompt
+      }]
+    });
+
+    for await (const chunk of stream) {
+      if (chunk.type === 'content_block_delta' && chunk.delta?.text) {
+        const openaiFormat = {
+          choices: [{
+            delta: {
+              content: chunk.delta.text
+            }
+          }]
+        };
+        res.write(`data: ${JSON.stringify(openaiFormat)}\n\n`);
+      }
+    }
+
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (error) {
+    console.error('Anthropic API error:', error);
+    res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+    res.end();
+  }
+}
+
+/**
+ * Generate email content using Anthropic API directly
+ * Bypasses slash command system which was causing meta-commentary issues
+ */
+async function generateEmailWithAnthropicAPI(req, res, userPrompt) {
+  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+
+  if (!ANTHROPIC_API_KEY) {
+    return res.status(500).json({ error: 'API key not configured' });
+  }
+
+  const systemPrompt = `YOU ARE AN EMAIL GENERATOR. OUTPUT ONLY THE EMAIL.
+
+FORBIDDEN - NEVER WRITE:
+- "Here's an email"
+- "I've created"
+- "The email needs your permission"
+- "Should I proceed"
+- "Would you like"
+- "What makes this work"
+- "**Subject:**"
+- ANY analysis
+- ANY explanation
+- ANY meta-commentary
+
+REQUIRED:
+- Start IMMEDIATELY with: Subject: [Email Subject Line]
+- Write ONLY the email content
+- End immediately when email ends
+- ZERO commentary before or after
+
+Write a marketing email for Numia (Data Blockchain Cloud).
+Target: Web3 developers, blockchain founders.
+Tone: Professional but conversational.
+
+OUTPUT ONLY THE EMAIL. START NOW.`;
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  try {
+    const stream = await anthropic.messages.stream({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2048,
+      temperature: 1,
+      system: systemPrompt,
+      messages: [{
+        role: 'user',
+        content: userPrompt
+      }]
+    });
+
+    for await (const chunk of stream) {
+      if (chunk.type === 'content_block_delta' && chunk.delta?.text) {
+        const openaiFormat = {
+          choices: [{
+            delta: {
+              content: chunk.delta.text
+            }
+          }]
+        };
+        res.write(`data: ${JSON.stringify(openaiFormat)}\n\n`);
+      }
+    }
+
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (error) {
+    console.error('Anthropic API error:', error);
+    res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+    res.end();
+  }
+}
+
+/**
+ * Generate LinkedIn content using Anthropic API directly
+ * Bypasses slash command system which was causing meta-commentary issues
+ */
+async function generateLinkedInWithAnthropicAPI(req, res, userPrompt) {
+  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+
+  if (!ANTHROPIC_API_KEY) {
+    return res.status(500).json({ error: 'API key not configured' });
+  }
+
+  const systemPrompt = `YOU ARE A LINKEDIN POST GENERATOR. OUTPUT ONLY THE POST TEXT.
+
+FORBIDDEN - NEVER WRITE:
+- "Here's a LinkedIn post"
+- "I've created"
+- "This post"
+- "What makes this work"
+- "Hook:"
+- "Structure:"
+- "Why this works"
+- "Key elements"
+- ANY analysis
+- ANY explanation
+- ANY meta-commentary
+
+REQUIRED:
+- Write ONLY the LinkedIn post text
+- Start with the first word of the post
+- End immediately when post ends
+- ZERO commentary before or after
+
+Write a LinkedIn post for Numia (Data Blockchain Cloud).
+Target: Web3 developers, blockchain founders.
+Tone: Conversational, peer-to-peer.
+
+OUTPUT ONLY THE POST TEXT. START NOW.`;
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  try {
+    const stream = await anthropic.messages.stream({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2048,
+      temperature: 1,
+      system: systemPrompt,
+      messages: [{
+        role: 'user',
+        content: userPrompt
+      }]
+    });
+
+    for await (const chunk of stream) {
+      if (chunk.type === 'content_block_delta' && chunk.delta?.text) {
+        const openaiFormat = {
+          choices: [{
+            delta: {
+              content: chunk.delta.text
+            }
+          }]
+        };
+        res.write(`data: ${JSON.stringify(openaiFormat)}\n\n`);
+      }
+    }
+
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (error) {
+    console.error('Anthropic API error:', error);
+    res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+    res.end();
+  }
+}
+
+/**
+ * Generate Twitter content using Anthropic API directly
+ */
+async function generateTwitterWithAnthropicAPI(req, res, userPrompt) {
+  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+
+  if (!ANTHROPIC_API_KEY) {
+    return res.status(500).json({ error: 'API key not configured' });
+  }
+
+  const systemPrompt = `YOU ARE A TWITTER THREAD GENERATOR. OUTPUT ONLY THE TWEET TEXT.
+
+FORBIDDEN - NEVER WRITE:
+- "Here's a thread"
+- "I've created"
+- "This thread"
+- "What makes this work"
+- "Hook:"
+- "Structure:"
+- "Why this works"
+- ANY analysis
+- ANY explanation
+- ANY meta-commentary
+
+REQUIRED:
+- Write ONLY the Twitter thread text
+- Start with the first tweet
+- Separate tweets with "---" on its own line
+- End immediately when thread ends
+- ZERO commentary before or after
+
+Write a Twitter thread for Numia (Data Blockchain Cloud).
+Target: Web3 developers, blockchain founders.
+Tone: Direct, conversational.
+
+OUTPUT ONLY THE THREAD TEXT. START NOW.`;
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  try {
+    const stream = await anthropic.messages.stream({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2048,
+      temperature: 1,
+      system: systemPrompt,
+      messages: [{
+        role: 'user',
+        content: userPrompt
+      }]
+    });
+
+    for await (const chunk of stream) {
+      if (chunk.type === 'content_block_delta' && chunk.delta?.text) {
+        const openaiFormat = {
+          choices: [{
+            delta: {
+              content: chunk.delta.text
+            }
+          }]
+        };
+        res.write(`data: ${JSON.stringify(openaiFormat)}\n\n`);
+      }
+    }
+
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (error) {
+    console.error('Anthropic API error:', error);
+    res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+    res.end();
+  }
+}
+
+/**
  * POST /api/generate-content
  * Generates content using local slash commands
  */
@@ -251,44 +555,38 @@ app.post('/api/generate-content', async (req, res) => {
       return res.status(400).json({ error: 'prompt and platform required' });
     }
 
-    // Map platform to slash command and intelligence files
+    // Map platform to slash command
+    // Note: Slash commands (.claude/commands/*.md) have comprehensive instructions built-in
+    // DO NOT load additional guidelines - they conflict with slash command instructions
     const platformConfig = {
-      'linkedin': {
-        command: '/linkedin',
-        guidelines: 'intelligence/post-guidelines/linkedin-guidelines.md'
-      },
-      'twitter': {
-        command: '/twitter',
-        guidelines: 'intelligence/post-guidelines/twitter-guidelines.md'
-      },
-      'blog': {
-        command: '/blog',
-        guidelines: 'intelligence/post-guidelines/blog-guidelines.md'
-      },
-      'email': {
-        command: '/email',
-        guidelines: 'intelligence/post-guidelines/email-guidelines.md'
-      },
-      'newsletter': {
-        command: '/newsletter',
-        guidelines: 'intelligence/post-guidelines/newsletter-guidelines.md'
-      }
+      'linkedin': '/linkedin',
+      'twitter': '/twitter',
+      'blog': '/blog',
+      'email': '/email',
+      'newsletter': '/newsletter'
     };
 
-    const config = platformConfig[platform];
-    if (!config) {
+    const slashCommand = platformConfig[platform];
+    if (!slashCommand) {
       return res.status(400).json({ error: `Unsupported platform: ${platform}` });
     }
 
-    // Load intelligence guidelines if they exist
-    let guidelinesContent = '';
-    if (config.guidelines) {
-      try {
-        const guidelinesPath = path.join(__dirname, config.guidelines);
-        guidelinesContent = await fs.readFile(guidelinesPath, 'utf-8');
-      } catch (error) {
-        console.warn(`Could not load guidelines for ${platform}:`, error.message);
-      }
+    // Use Anthropic API directly for ALL platforms with strict system prompts
+    // Slash commands are being ignored and causing meta-commentary instead of content
+    if (platform === 'blog') {
+      return await generateBlogWithAnthropicAPI(req, res, prompt);
+    }
+
+    if (platform === 'email') {
+      return await generateEmailWithAnthropicAPI(req, res, prompt);
+    }
+
+    if (platform === 'linkedin') {
+      return await generateLinkedInWithAnthropicAPI(req, res, prompt);
+    }
+
+    if (platform === 'twitter') {
+      return await generateTwitterWithAnthropicAPI(req, res, prompt);
     }
 
     // Set response headers for streaming
@@ -303,12 +601,10 @@ app.post('/api/generate-content', async (req, res) => {
       env: { ...process.env }
     });
 
-    // Send the slash command + guidelines context + prompt
-    let fullPrompt = config.command;
-    if (guidelinesContent) {
-      fullPrompt += `\n\nGuidelines to follow:\n${guidelinesContent}\n\nUser prompt:`;
-    }
-    fullPrompt += ` ${prompt}\n`;
+    // Send slash command with user prompt directly
+    // DO NOT append guidelines - the slash command already has comprehensive instructions
+    // Adding guidelines causes Claude to describe the structure instead of writing content
+    const fullPrompt = `${slashCommand} ${prompt}\n`;
 
     claudeProcess.stdin.write(fullPrompt);
     claudeProcess.stdin.end();
@@ -413,6 +709,49 @@ app.post('/api/generate-content', async (req, res) => {
       /^The post/i,  // "The post needs to..."
       /^The thread/i,  // "The thread should..."
       /^The blog/i,    // "The blog must..."
+      /^The structure/i,  // "The structure covers..."
+      /^\*\*.*\*\*:?$/i,  // Lines that are just **Bold Text:** (markdown headers)
+      /^I've created a/i,  // "I've created a comprehensive blog post..."
+      /hits hard on/i,  // "The post hits hard on..."
+      /^Making it/i,  // "Making it personal"
+      /^Showing /i,  // "Showing competitive advantage"
+      /^Exposing /i,  // "Exposing the hidden cost"
+      /^Opening with/i,  // "Opening with a real scenario"
+      /^Concrete examples/i,  // "Concrete examples"
+      /^\d+\.\s+\*\*/i,  // Numbered lists with bold like "1. **Something**"
+      /^Structure:/i,  // "Structure: Opens with..."
+      /^Hook Strategy:/i,  // "Hook Strategy: Uses..."
+      /^Tone:/i,  // "Tone: Conversational and..."
+      /^FOMO Triggers:/i,  // "FOMO Triggers:"
+      /^Product Coverage:/i,  // "Product Coverage: Woven..."
+      /^Avoids AI Tells:/i,  // "Avoids AI Tells:"
+      /^Would you like me to/i,  // "Would you like me to save..."
+      /^No "moreover,"/i,  // "No 'moreover,' 'furthermore'..."
+      /^Should I proceed/i,  // "Should I proceed with saving..."
+      /^FIX IT/i,  // User's frustration (shouldn't be in output)
+      /^\*\*Title:\*\*/i,  // "**Title:**"
+      /^\*\*What I've crafted:\*\*/i,  // "**What I've crafted:**"
+      /^\*\*Key Elements:\*\*/i,  // "**Key Elements:**"
+      /^\*\*Structure:\*\*/i,  // "**Structure:**"
+      /^\*\*Target Audience/i,  // "**Target Audience Pain Points:**"
+      /^-\s+\*\*Creates urgency\*\*/i,  // Bullet points with bold
+      /^-\s+\*\*Quantifies/i,
+      /^-\s+\*\*Highlights/i,
+      /^-\s+\*\*Builds FOMO\*\*/i,
+      /^-\s+\*\*Demonstrates/i,
+      /^-\s+\*\*Showcases/i,
+      /^-\s+Data fragmentation/i,
+      /^-\s+Inability to answer/i,
+      /^-\s+Manual data processes/i,
+      /^-\s+Competitive disadvantage/i,
+      /^-\s+Missing opportunities/i,
+      /^The post needs your permission/i,
+      /^-\s+SEO-optimized/i,
+      /^-\s+Scannable/i,
+      /^-\s+Provocative but/i,
+      /^-\s+Ends with strong/i,
+      /^\d+\+? words/i,  // "2,400+ words"
+      /^10-minute read/i,
     ];
 
     // NUCLEAR: Patterns that indicate meta-analysis AFTER content
@@ -422,6 +761,8 @@ app.post('/api/generate-content', async (req, res) => {
       /^[!?]?\s*I'?ve\s+created\s+a\s+blog\s+post/i,
       /^Unique\s+aspects?:/i,
       /^Human\s+touches?\s+(?:added|included)?:/i,
+      /^Human\s+Touch\s+Elements:/i,
+      /^Variation\s+Elements?\s+Used:/i,
       /^No\s+Numia\s+pitch/i,
       /^The\s+focus\s+is/i,
       /^Length:/i,
@@ -444,6 +785,7 @@ app.post('/api/generate-content', async (req, res) => {
       /^Call to Action:/i,
       /^Why this works:/i,
       /^What makes this/i,
+      /^What makes \w+ unique:/i,
 
       // "This [content type]..." analysis
       /^This post/i,
@@ -484,6 +826,8 @@ app.post('/api/generate-content', async (req, res) => {
       /without feeling like/i,
       /The blog post is ready/i,
       /The post is ready/i,
+      /^Should I proceed/i,
+      /^Would you like me to/i,
     ];
 
     const shouldSkipPreContentLine = (line) => {

@@ -154,6 +154,18 @@ function cleanGeneratedContent(rawContent: string): string {
     /^Topic:.*$/im,
     /^Thread\s+Length:.*$/im,
     /^🧵.*$/im,
+    /^The structure/i,
+    /^\*\*.*\*\*:?\s*$/i,
+    /^I've created a/i,
+    /hits hard on/i,
+    /^Making it/i,
+    /^Showing /i,
+    /^Exposing /i,
+    /^Opening with/i,
+    /^Concrete examples/i,
+    /^\d+\.\s+\*\*/i,
+    /^Should I proceed/i,
+    /^Would you like/i,
   ];
 
   // Apply ALL leading meta patterns multiple times
@@ -182,15 +194,19 @@ function cleanGeneratedContent(rawContent: string): string {
     /\n\n[!?]?\s*I'?ve\s+created\s+a\s+blog\s+post.*$/is,
     /\n\nUnique\s+aspects?:.*$/is,
     /\n\nHuman\s+touches?\s+(?:added|included)?:.*$/is,
+    /\n\nHuman\s+Touch\s+Elements:.*$/is,
+    /\n\nVariation\s+Elements?\s+Used:.*$/is,
     /\n\nNo\s+Numia\s+pitch.*$/is,
     /\n\nThe\s+focus\s+is.*$/is,
     /\n\nLength:.*$/is,
     /\n\n~?\d+[,\d]*\s+words?.*$/is,  // "~1,300 words"
 
     // Analysis headers - catch ANY variation
-    /\n\n(?:What makes this work|Why this works|What works here|Why this lands|What I did|How this works|The strategy|The approach).*$/is,
+    /\n\n(?:What makes this work|Why this works|What works here|Why this lands|What I did|How this works|The strategy|The approach|What makes \w+ unique).*$/is,
     /\n\n(?:Key\s+elements?\s+(?:I\s+)?(?:baked\s+in|used|included|added)).*$/is,
     /\n\n(?:The\s+Hook|FOMO\s+Elements|Product\s+Integration|Humanized\s+Writing|Call\s+to\s+Action|Analysis|Breakdown|Structure|Key\s+Elements|Strategy|Approach):.*$/is,
+    /\n\nShould I proceed.*$/is,
+    /\n\nWould you like.*$/is,
 
     // "This [thing]..." analysis
     /\n\nThis\s+(?:post|thread|content|approach|blog|article|email|newsletter|strategy|should).*$/is,

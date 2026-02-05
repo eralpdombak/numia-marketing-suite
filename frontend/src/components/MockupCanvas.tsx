@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useState } from "react";
+import { forwardRef, useCallback, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { DeviceFrame } from "./DeviceFrames";
 import { MockupSettings, UploadedImage } from "@/types/mockup";
@@ -32,6 +32,32 @@ export const MockupCanvas = forwardRef<HTMLElement, MockupCanvasProps>(
       setIsDragging(false);
     }, []);
 
+    const processFile = useCallback((file: File, callback: (image: UploadedImage) => void) => {
+      if (!file.type.startsWith('image/')) {
+        console.log('[MockupCanvas] Not an image file:', file.type);
+        return;
+      }
+
+      console.log('[MockupCanvas] Processing file:', file.name, file.type, file.size);
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const src = e.target?.result as string;
+        console.log('[MockupCanvas] File loaded, data URL length:', src?.length);
+        if (src) {
+          callback({
+            id: crypto.randomUUID(),
+            src,
+            name: file.name,
+          });
+        }
+      };
+      reader.onerror = (error) => {
+        console.error('[MockupCanvas] FileReader error:', error);
+      };
+      reader.readAsDataURL(file);
+    }, []);
+
     const handleDrop = useCallback((e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
@@ -41,29 +67,49 @@ export const MockupCanvas = forwardRef<HTMLElement, MockupCanvasProps>(
       if (files && files.length > 0 && onImageUpload) {
         processFile(files[0], onImageUpload);
       }
-    }, [onImageUpload]);
+    }, [onImageUpload, processFile]);
 
     const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
       if (files && files.length > 0 && onImageUpload) {
         processFile(files[0], onImageUpload);
       }
-    }, [onImageUpload]);
+    }, [onImageUpload, processFile]);
 
-    const processFile = (file: File, callback: (image: UploadedImage) => void) => {
-      if (!file.type.startsWith('image/')) return;
+    // Handle paste events
+    useEffect(() => {
+      if (image || !onImageUpload) return;
 
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const src = e.target?.result as string;
-        callback({
-          id: crypto.randomUUID(),
-          src,
-          name: file.name,
-        });
+      const handlePaste = async (e: ClipboardEvent) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+
+        console.log('[MockupCanvas] Paste event, items:', items.length);
+
+        // Look for image items first
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          console.log('[MockupCanvas] Item', i, ':', item.type, item.kind);
+
+          if (item.type.startsWith('image/')) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const blob = item.getAsFile();
+            if (blob) {
+              console.log('[MockupCanvas] Got image blob:', blob.size, 'bytes');
+              // Create a proper File object with timestamp name
+              const file = new File([blob], `pasted-image-${Date.now()}.png`, { type: blob.type });
+              processFile(file, onImageUpload);
+              return;
+            }
+          }
+        }
       };
-      reader.readAsDataURL(file);
-    };
+
+      window.addEventListener('paste', handlePaste);
+      return () => window.removeEventListener('paste', handlePaste);
+    }, [image, onImageUpload, processFile]);
 
     const isImageBackground = settings.backgroundColor.startsWith('data:') || 
                               settings.backgroundColor.startsWith('http') || 
